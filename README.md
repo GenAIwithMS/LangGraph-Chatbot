@@ -30,8 +30,8 @@ A sophisticated chatbot implementation built using LangGraph, featuring a multi-
 
 1. Clone the repository:
 ```bash
-git clone [repository-url]
-cd [repository-name]
+git clone https://github.com/GenAIwithMS/LangGraph-Chatbot
+cd LangGraph-Chatbot
 ```
 
 2. Install dependencies:
@@ -88,3 +88,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - LangGraph team for the framework
 - Groq for the language model
 - Streamlit for the frontend framework
+
