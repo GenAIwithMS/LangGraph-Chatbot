@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from .database_backend import chatbot, Retrieve_all_threads, save_thread_title, get_all_thread_metadata
+from .app.router.database_backend import chatbot, Retrieve_all_threads, save_thread_title, get_all_thread_metadata
 from langchain_core.messages import HumanMessage
 import uuid
 

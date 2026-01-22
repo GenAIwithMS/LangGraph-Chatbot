@@ -5,7 +5,7 @@
 # raw = model.invoke(prompt)
 # print(type(raw), repr(raw))
 # import requests
-from all_tools import weather,search,calculator,stock_price
+from app.tools.all_tools import weather,search,calculator,stock_price
 
 weather_data = weather("lahore")
 print(weather_data)

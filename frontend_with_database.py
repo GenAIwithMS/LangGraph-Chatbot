@@ -2,11 +2,11 @@ import uuid
 import tempfile
 # import streamlit as st
 import streamlit as st
-from database_backend import chatbot , Retrieve_all_threads
+from app.router.database_backend import chatbot , Retrieve_all_threads
 from thread_id_name import  generate_thread_id, generate_id_name
 # from langchain_core.messages import HumanMessage,AIMessage,ToolMessage
 from langchain_core.messages import HumanMessage, AIMessage,ToolMessage
-from database_backend import save_thread_title, get_thread_title_from_db, get_all_thread_metadata
+from app.router.database_backend import save_thread_title, get_thread_title_from_db, get_all_thread_metadata
 
 
 def reset_chat():
