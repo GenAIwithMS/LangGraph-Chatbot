@@ -6,7 +6,7 @@ duckduckgo-search
 streamlit
 langgraph-checkpoint-sqlite
 langchain_community
-newsdataapi 
+newsdataapi
 langchain-openai
 langchain_huggingface
 langchain_unstructured
