@@ -1,0 +1,17 @@
+langchain-core
+python-dotenv
+langchain-groq
+langgraph
+duckduckgo-search
+streamlit
+langgraph-checkpoint-sqlite
+langchain_community
+newsdataapi 
+langchain-openai
+langchain_huggingface
+langchain_unstructured
+sentence-transformers
+faiss-cpu
+fastapi
+uvicorn
+langsmith
