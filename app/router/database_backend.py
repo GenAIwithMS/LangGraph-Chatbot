@@ -9,8 +9,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph , START , END
 from langgraph.prebuilt import ToolNode,tools_condition
 from rag_backend import rag_tool
-from all_tools import search, weather, calculator, stock_price
-# from Rag import has_document, create_thread_aware_search_tool
+from app.tools.all_tools import search, weather, calculator, stock_price
 
 load_dotenv()
 
@@ -33,14 +32,6 @@ def generate_id_name(question : str):
 @traceable(name="My GPT")
 def chat_node(state: Chatstate):
     messages = state["messages"]
-    # thread_id = state.get("thread_id")
-
-    # if has_document(thread_id):
-    #     doc_tool = create_thread_aware_search_tool(thread_id)
-    #     tools = all_tools + [doc_tool]
-    # else:
-    #     tools = all_tools
-
     model_with_tools = model.bind_tools(all_tools)
     
     response = model_with_tools.invoke(messages)
