@@ -1,3 +1,8 @@
+"""
+RAG (Retrieval Augmented Generation) Service
+Handles PDF upload, processing, and document retrieval
+"""
+
 import os
 import tempfile
 from typing import Dict, Any, Optional
@@ -5,8 +10,7 @@ from typing import Dict, Any, Optional
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.tools import tool
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # Initialize HuggingFace embeddings
 try:
@@ -27,15 +31,12 @@ def _get_retriever(thread_id: Optional[str]):
     return None
 
 
-def ingest_pdf(file_bytes: bytes,thread_id: str,filename: Optional[str] = None,embeddings: Optional[Any] = None,) -> dict:
+def ingest_pdf(file_bytes: bytes, thread_id: str, filename: Optional[str] = None, embeddings: Optional[Any] = None) -> dict:
     """
     Build a FAISS retriever for the uploaded PDF and store it for the thread.
 
     Returns a summary dict that can be surfaced in the UI.
     """
-    # if not file_bytes:
-    #     raise ValueError("No bytes received for ingestion.")
-
     if embeddings is None:
         embeddings = _DEFAULT_EMBEDDINGS
 
@@ -82,11 +83,10 @@ def ingest_pdf(file_bytes: bytes,thread_id: str,filename: Optional[str] = None,e
             pass
 
 
-@tool
-def rag_tool(query: str, thread_id: Optional[str] = None) -> dict:
+def retrieve_from_document(query: str, thread_id: str) -> dict:
     """
     Retrieve relevant information from the uploaded PDF for this chat thread.
-    Always include the thread_id when calling this tool.
+    Returns context and metadata from the document.
     """
     retriever = _get_retriever(thread_id)
     if retriever is None:
@@ -95,8 +95,7 @@ def rag_tool(query: str, thread_id: Optional[str] = None) -> dict:
             "query": query,
         }
 
-    # Use the retriever API to fetch relevant documents. Different retriever
-    # implementations expose slightly different method names, so try common ones.
+    # Use the retriever API to fetch relevant documents
     try:
         results = retriever.get_relevant_documents(query)
     except AttributeError:
@@ -114,3 +113,13 @@ def rag_tool(query: str, thread_id: Optional[str] = None) -> dict:
         "metadata": metadata,
         "source_file": _THREAD_METADATA.get(str(thread_id), {}).get("filename"),
     }
+
+
+def has_document(thread_id: str) -> bool:
+    """Check if a thread has an uploaded document."""
+    return str(thread_id) in _THREAD_RETRIEVERS
+
+
+def get_document_info(thread_id: str) -> Optional[dict]:
+    """Get metadata about the uploaded document for a thread."""
+    return _THREAD_METADATA.get(str(thread_id))

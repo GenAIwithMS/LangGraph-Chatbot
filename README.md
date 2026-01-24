@@ -1,79 +1,211 @@
-# Agentic Chatbot with LangGraph
+# AI Chatbot with LangGraph & RAG
 
-A sophisticated chatbot implementation built using LangGraph, featuring a multi-threaded conversation system with persistent storage and various tool integrations.
+A sophisticated chatbot implementation built using LangGraph, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, and persistent storage.
 
 ## Features
 
+- **FastAPI Backend**: Modern REST API with automatic documentation
+- **React Frontend**: ChatGPT-inspired UI with Tailwind CSS
 - **Multi-threaded Conversations**: Support for multiple chat threads with unique identifiers
-- **Persistent Storage**: SQLite backend for storing conversation history
-- **Streamlit Frontend**: User-friendly web interface
+- **RAG (Retrieval Augmented Generation)**: PDF upload and document Q&A
+- **Persistent Storage**: SQLite backend for storing conversation history and checkpoints
 - **Tool Integration**: Multiple tools for enhanced functionality:
-  - Web Search
-  - Weather Information
+  - Web Search (Brave API)
+  - Weather Information (OpenWeather API)
   - Calculator
-  - Stock Price Lookup
+  - Stock Price Lookup (Alpha Vantage API)
 
 ## Technology Stack
 
-- **Framework**: LangGraph
-- **Model**: Groq (OpenAI GPT OSS 120B)
-- **Frontend**: Streamlit
-- **Database**: SQLite
+### Backend
+- **Framework**: FastAPI + LangGraph
+- **Model**: Groq ChatGroq (qwen/qwen3-32b)
+- **Database**: SQLite with SqliteSaver checkpointer
+- **RAG**: FAISS + HuggingFace Embeddings
 - **Language**: Python 3.x
+
+### Frontend
+- **Framework**: React 18 + Vite
+- **Styling**: Tailwind CSS
+- **HTTP Client**: Axios
+- **Markdown**: React Markdown with GitHub Flavored Markdown
+- **Icons**: Lucide React
 
 ## Prerequisites
 
-- Python 3.x
-- Environment variables configured (see Configuration section)
+- Python 3.8+
+- Node.js 18+ and npm
+- API Keys (configured in `.env` file):
+  - GROQ_API_KEY
+  - BRAVE_API_KEY (for search)
+  - OPENWEATHER_API_KEY (for weather)
+  - ALPHA_VANTAGE_API_KEY (for stocks)
+  - LANGSMITH_API_KEY (optional, for tracing)
 
-## Installation
+## Quick Start
 
-1. Clone the repository:
+### Option 1: Use Start Script (Windows)
+
+Simply double-click `start.bat` or run:
 ```bash
-git clone [repository-url]
-cd [repository-name]
+start.bat
 ```
 
-2. Install dependencies:
+This will start both the backend (port 8000) and frontend (port 3000) automatically.
+
+### Option 2: Manual Start
+
+**1. Start Backend:**
 ```bash
-pip install -r requirements.txt
+python main.py
 ```
+
+**2. Start Frontend:**
+```bash
+cd frontend
+npm install  # First time only
+npm run dev
+```
+
+**Access the application:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Documentation: http://localhost:8000/docs
 
 ## Configuration
 
-1. Create a `.env` file in the project root
-2. Configure the necessary API keys and environment variables
+1. Create a `.env` file in the project root:
+```bash
+cp .env.example .env
+```
+
+2. Add your API keys:
+```env
+GROQ_API_KEY=your_groq_api_key
+BRAVE_API_KEY=your_brave_api_key
+OPENWEATHER_API_KEY=your_openweather_api_key
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key
+LANGSMITH_API_KEY=your_langsmith_key  # Optional
+```
 
 ## Project Structure
 
-- `frontend_with_database.py`: Streamlit frontend implementation
-- `database_backend.py`: Backend logic and LangGraph integration
-- `tools.py`: Custom tool implementations
-- `thread_id_name.py`: Thread management utilities
-- `requirements.txt`: Project dependencies
-
-## Running the Application
-
-1. Start the Streamlit server:
-```bash
-streamlit run frontend_with_database.py
+```
+.
+├── app/                      # FastAPI application
+│   ├── main.py              # FastAPI app initialization
+│   ├── router/              # API route handlers
+│   │   └── chat.py          # Chat, threads, RAG endpoints
+│   ├── schema/              # Pydantic models
+│   │   └── models.py        # Request/response schemas
+│   ├── services/            # Business logic
+│   │   ├── chatbot_service.py   # LangGraph chatbot
+│   │   ├── chat_service.py      # Chat operations
+│   │   ├── rag_service.py       # RAG/PDF processing
+│   │   └── thread_service.py    # Thread management
+│   └── tools/               # External API tools
+│       └── all_tools.py     # Search, weather, calc, stocks
+├── frontend/                # React frontend
+│   ├── src/
+│   │   ├── components/      # React components
+│   │   ├── hooks/           # Custom hooks
+│   │   ├── services/        # API client
+│   │   └── App.jsx          # Main app
+│   ├── package.json
+│   └── vite.config.js
+├── main.py                  # Backend entry point
+├── requirements.txt         # Python dependencies
+├── start.bat               # Windows startup script
+└── start.sh                # Linux/Mac startup script
 ```
 
-2. Open your browser and navigate to the provided local URL (typically http://localhost:8501)
+## API Endpoints
+
+### Chat
+- `POST /api/chat` - Send a message and get response
+- `POST /api/chat/stream` - Stream response using Server-Sent Events
+
+### Threads
+- `GET /api/threads` - Get all conversation threads
+- `POST /api/threads/new` - Create a new thread
+- `GET /api/threads/{id}` - Get messages from a thread
+- `PUT /api/threads/{id}/title` - Update thread title
+
+### RAG/Documents
+- `POST /api/upload-pdf` - Upload a PDF document
+- `POST /api/query-document` - Query the uploaded document
+- `GET /api/threads/{id}/document` - Get document information
 
 ## Features in Detail
 
-### Chat Threads
-- Create new chat threads
-- Switch between existing threads
-- Persistent conversation history
-- Automatic thread title generation
+### Chat Interface
+- **Real-time Messaging**: Instant message delivery with loading states
+- **Markdown Support**: Rich text formatting in responses
+- **Code Highlighting**: Syntax highlighting for code blocks
+- **Auto-scroll**: Automatically scrolls to latest messages
+
+### Thread Management
+- **Multiple Conversations**: Create and manage multiple chat threads
+- **Thread Titles**: Auto-generated or custom thread titles
+- **Conversation History**: All messages persisted in SQLite
+- **Quick Switching**: Easy navigation between threads
+
+### RAG (Document Q&A)
+- **PDF Upload**: Drag & drop or click to upload PDF files
+- **Document Chunking**: Automatic text splitting for better retrieval
+- **Vector Search**: FAISS-based similarity search
+- **Context-Aware**: Answers based on uploaded documents
 
 ### Tool Integration
-- Web search capabilities
-- Real-time weather information
-- Basic calculator functionality
-- Stock price lookup
+- **Web Search**: Brave Search API for real-time information
+- **Weather**: Current weather data from OpenWeather API
+- **Calculator**: Built-in math expression evaluation
+- **Stock Prices**: Real-time stock data from Alpha Vantage
+
+## Development
+
+### Backend Development
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run in development mode
+python main.py
+
+# API docs available at http://localhost:8000/docs
+```
+
+### Frontend Development
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start dev server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Troubleshooting
+
+### Backend Issues
+- **Import Errors**: Ensure all dependencies are installed with `pip install -r requirements.txt`
+- **API Key Errors**: Check `.env` file has all required API keys
+- **Database Errors**: Delete `chatbot.db` and restart to reset database
+
+### Frontend Issues
+- **CORS Errors**: Backend must allow `http://localhost:3000` origin
+- **Connection Refused**: Ensure backend is running on port 8000
+- **Build Errors**: Delete `node_modules` and run `npm install` again
+
+### Common Solutions
+1. Check that all API keys are valid in `.env`
+2. Ensure ports 3000 and 8000 are not in use
+3. Verify Python 3.8+ and Node.js 18+ are installed
+4. Check firewall settings if connection issues persist
 
 ## Contributing
 
@@ -85,6 +217,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- LangGraph team for the framework
-- Groq for the language model
-- Streamlit for the frontend framework
+- LangGraph team for the agentic framework
+- Groq for fast LLM inference
+- FastAPI for the modern Python web framework
+- React and Vite for the frontend tooling

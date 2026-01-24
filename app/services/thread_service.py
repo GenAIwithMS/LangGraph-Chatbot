@@ -1,19 +1,30 @@
+"""
+Thread Service
+Handles thread ID generation and title generation
+"""
+
 from pydantic import BaseModel, Field
-# from langchain_groq import ChatGroq
-from langchain_groq import ChatGroq
+# from langchain_groq import 
+from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 import uuid
-load_dotenv()
+import os
 
-model = ChatGroq(model="qwen/qwen3-32b")
+load_dotenv()
+api = os.getenv("OPENAI_API_KEY")
+
+model = ChatOpenAI(model="openai/gpt-oss-120b", openai_api_key=api, base_url="https://api.canopywave.io/v1")
+
 
 class StructuredModel(BaseModel):
     title: str = Field(description="A short chat title (<= 5 words).")
 
+
 structured_model = model.with_structured_output(StructuredModel)
 
+
 def generate_id_name(question: str):
-   
+    """Generate a short title from a question/message"""
     prompt = f"""
     Create a chat title in 5 words or fewer.
     Title only, no explanation.
@@ -22,8 +33,6 @@ def generate_id_name(question: str):
 
     try:
         llm = structured_model.invoke(prompt)
-        # if llm and getattr(llm, "title", None):
-        #     return llm.title
         if llm and hasattr(llm, "title") and llm.title:
             return llm.title
     except Exception as e:
@@ -33,26 +42,15 @@ def generate_id_name(question: str):
     raw = model.invoke(prompt)
     return raw.content.strip()
 
+
 def generate_thread_id():
+    """Generate a unique thread ID"""
     thread_id = str(uuid.uuid4())
     return thread_id
 
-# thread_id = generate_thread_id()
-
-# def access(message):
-#     name = generate_id_name(message)
-#     dic = {thread_id: name}
-#     return dic
 
 def generate_thread_title(message: str):
     """Generate a thread title from a message without circular dependencies"""
     name = generate_id_name(message)
     thread_id = generate_thread_id()
     return {thread_id: name}
-
-# massage = "tell me about Langchain and why we use them"
-
-# number = access(massage)
-# value = list(number.values())[0]
-# print(number)
-# print(structured_model)
