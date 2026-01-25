@@ -60,7 +60,7 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
 
       {/* Input Area */}
       <div
-        className={`max-w-3xl mx-auto px-4 py-4 ${
+        className={`max-w-3xl mx-auto px-4 py-3 ${
           isDragging ? 'bg-blue-900/20 border-2 border-blue-500 border-dashed rounded-lg' : ''
         }`}
         onDrop={handleDrop}
@@ -132,7 +132,7 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
         </form>
 
         {/* Helper Text */}
-        <div className="mt-2 text-xs text-center text-gray-500">
+        <div className="mt-1 text-xs text-center text-gray-500">
           {isDragging ? (
             <span className="text-blue-400">Drop your PDF file here</span>
           ) : (

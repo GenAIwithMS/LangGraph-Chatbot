@@ -8,6 +8,7 @@ from app.services.chatbot_service import (
     get_all_thread_metadata
 )
 from app.services.thread_service import generate_thread_id, generate_id_name
+from app.services.rag_service import has_document
 
 
 class ChatService:
@@ -23,10 +24,6 @@ class ChatService:
     
     @staticmethod
     def get_or_create_thread_title(thread_id: str, user_message: Optional[str] = None) -> str:
-        """
-        Get thread title from DB or generate new one from user message.
-        Maintains the same logic as the Streamlit frontend.
-        """
         # Try to fetch from DB first
         db_title = get_thread_title_from_db(thread_id)
         
@@ -48,10 +45,6 @@ class ChatService:
     
     @staticmethod
     def get_all_threads() -> List[Dict[str, str]]:
-        """
-        Retrieve all threads with their titles.
-        Returns list of dicts with thread_id and title.
-        """
         thread_ids = retrieve_all_threads()
         metadata = get_all_thread_metadata()
         
@@ -67,10 +60,6 @@ class ChatService:
     
     @staticmethod
     def load_conversation(thread_id: str) -> List[Dict[str, str]]:
-        """
-        Load conversation history for a thread.
-        Returns messages in format compatible with frontend.
-        """
         try:
             state = chatbot.get_state(config={"configurable": {"thread_id": thread_id}})
             messages = state.values.get("messages", [])
@@ -83,15 +72,13 @@ class ChatService:
                         "type": "human"
                     })
                 elif isinstance(message, AIMessage):
-                    formatted_messages.append({
-                        "content": message.content,
-                        "type": "ai"
-                    })
-                elif isinstance(message, ToolMessage):
-                    formatted_messages.append({
-                        "content": message.content,
-                        "type": "tool"
-                    })
+                    # Only add AI messages that have actual content (not just tool calls)
+                    if message.content:
+                        formatted_messages.append({
+                            "content": message.content,
+                            "type": "ai"
+                        })
+                # Skip ToolMessage - don't show tool responses to user
             
             return formatted_messages
         except Exception as e:
@@ -100,19 +87,21 @@ class ChatService:
     
     @staticmethod
     def send_message(message: str, thread_id: str) -> Dict[str, Any]:
-        """
-        Send a message and get response.
-        Maintains the same logic as the Streamlit frontend.
-        """
         config = {
             "configurable": {"thread_id": thread_id},
             "metadata": {"thread_id": thread_id}
         }
         
         try:
+            # Check if thread has a document
+            doc_exists = has_document(thread_id)
+            
             # Invoke chatbot with user message
             final_state = chatbot.invoke(
-                {"messages": [HumanMessage(content=message)]},
+                {
+                    "messages": [HumanMessage(content=message)],
+                    "has_document": doc_exists
+                },
                 config=config
             )
             
@@ -140,40 +129,31 @@ class ChatService:
     
     @staticmethod
     def stream_message(message: str, thread_id: str):
-        """
-        Stream message response.
-        Yields chunks of the response as they arrive.
-        """
         config = {
             "configurable": {"thread_id": thread_id},
             "metadata": {"thread_id": thread_id}
         }
         
         try:
+            # Check if thread has a document
+            doc_exists = has_document(thread_id)
+            
             for message_chunk, metadata in chatbot.stream(
-                {"messages": [HumanMessage(content=message)]},
+                {
+                    "messages": [HumanMessage(content=message)],
+                    "has_document": doc_exists
+                },
                 config=config,
                 stream_mode="messages",
             ):
-                # Yield different types of messages
-                if isinstance(message_chunk, ToolMessage):
-                    yield {
-                        "content": message_chunk.content,
-                        "message_type": "tool",
-                        "tool_name": getattr(message_chunk, "name", "tool")
-                    }
-                elif isinstance(message_chunk, AIMessage):
+                # Only yield AI messages with content (skip tool messages and empty AI messages)
+                if isinstance(message_chunk, AIMessage) and message_chunk.content:
                     yield {
                         "content": message_chunk.content,
                         "message_type": "ai",
                         "tool_name": None
                     }
-                elif isinstance(message_chunk, HumanMessage):
-                    yield {
-                        "content": message_chunk.content,
-                        "message_type": "human",
-                        "tool_name": None
-                    }
+                # Skip ToolMessage and HumanMessage in stream (already displayed by frontend)
         except Exception as e:
             print(f"Error streaming message: {e}")
             raise Exception(f"Failed to stream message: {str(e)}")

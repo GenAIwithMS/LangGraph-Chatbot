@@ -137,10 +137,8 @@ function App() {
       <div className="flex-1 flex flex-col h-screen">
         {/* Header */}
         <div className="flex-shrink-0 border-b border-gray-700 px-4 py-3 bg-chat-bg">
-          <div className="max-w-3xl mx-auto flex items-center justify-between">
-            <h1 className="text-lg font-semibold">
-              {threads.find(t => t.thread_id === currentThreadId)?.title || 'New Chat'}
-            </h1>
+          <div className="max-w-3xl mx-auto">
+            {/* Empty header or add logo/branding here if needed */}
           </div>
         </div>
 

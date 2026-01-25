@@ -7,14 +7,14 @@ from app.router.health import health_router
 def create_app():
     app = FastAPI(
         title="LangGraph Chatbot API",
-        description="FastAPI backend for LangGraph-powered chatbot with multi-thread support",
+        description="FastAPI backend for LangGraph-powered chatbot also multi-thread support",
         version="1.0.0"
     )
 
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Update this with your frontend URL in production
+        allow_origins=["*"],  
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
