@@ -1,8 +1,3 @@
-"""
-RAG (Retrieval Augmented Generation) Service
-Handles PDF upload, processing, and document retrieval
-"""
-
 import os
 import tempfile
 from typing import Dict, Any, Optional

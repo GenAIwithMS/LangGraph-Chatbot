@@ -1,10 +1,4 @@
-"""
-Thread Service
-Handles thread ID generation and title generation
-"""
-
 from pydantic import BaseModel, Field
-# from langchain_groq import 
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 import uuid
