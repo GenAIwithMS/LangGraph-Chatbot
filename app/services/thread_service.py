@@ -7,7 +7,11 @@ import os
 load_dotenv()
 api = os.getenv("OPENAI_API_KEY")
 
-model = ChatOpenAI(model="openai/gpt-oss-120b", openai_api_key=api, base_url="https://api.canopywave.io/v1")
+model = ChatOpenAI(
+    model="openai/gpt-oss-120b",
+    openai_api_key=api,
+    base_url="https://api.canopywave.io/v1"
+    )
 
 
 class StructuredModel(BaseModel):

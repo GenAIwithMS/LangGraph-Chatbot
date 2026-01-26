@@ -10,7 +10,6 @@ from app.services.chatbot_service import (
 from app.services.thread_service import generate_thread_id, generate_id_name
 from app.services.rag_service import has_document
 
-
 class ChatService:
     """Service class to handle chat-related business logic"""
     
@@ -18,13 +17,11 @@ class ChatService:
     def create_new_thread() -> str:
         """Create a new thread and return its ID"""
         thread_id = generate_thread_id()
-        # Initialize with default title
         save_thread_title(thread_id, "New Chat")
         return thread_id
     
     @staticmethod
     def get_or_create_thread_title(thread_id: str, user_message: Optional[str] = None) -> str:
-        # Try to fetch from DB first
         db_title = get_thread_title_from_db(thread_id)
         
         # If title is "New Chat" (default), generate a new one from the message
@@ -72,13 +69,11 @@ class ChatService:
                         "type": "human"
                     })
                 elif isinstance(message, AIMessage):
-                    # Only add AI messages that have actual content (not just tool calls)
                     if message.content:
                         formatted_messages.append({
                             "content": message.content,
                             "type": "ai"
                         })
-                # Skip ToolMessage - don't show tool responses to user
             
             return formatted_messages
         except Exception as e:

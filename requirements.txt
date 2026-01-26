@@ -3,7 +3,6 @@ python-dotenv
 langchain-groq
 langgraph
 duckduckgo-search
-langgraph-checkpoint-sqlite
 langchain_community
 newsdataapi
 langchain-openai
@@ -18,3 +17,5 @@ python-multipart
 pydantic
 requests
 pypdf
+sqlalchemy
+pymysql

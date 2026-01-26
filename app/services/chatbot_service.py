@@ -1,15 +1,16 @@
-import sqlite3
 from dotenv import load_dotenv
 from langsmith import traceable
 from typing import TypedDict, Annotated
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langgraph.graph.message import add_messages
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from app.tools.all_tools import search, weather, calculator, stock_price
 from app.services.rag_service import has_document, retrieve_from_document
+from database.config import DatabaseConfig
+from database.mysql_checkpoint import MySQLCheckpointSaver
+from database.models import ThreadMetadata
 import os
 
 load_dotenv()
@@ -18,7 +19,11 @@ api = os.getenv("OPENAI_API_KEY")
 
 
 
-model = ChatOpenAI(model="openai/gpt-oss-120b", openai_api_key=api, base_url="https://api.canopywave.io/v1")
+model = ChatOpenAI(
+    model="openai/gpt-oss-120b",
+    openai_api_key=api,
+    base_url="https://api.canopywave.io/v1"
+    )
 
 # Available tools for the chatbot
 all_tools = [search, weather, calculator, stock_price]
@@ -84,22 +89,14 @@ graph.add_edge(START, "chat_node")
 graph.add_conditional_edges("chat_node", tools_condition)
 graph.add_edge("tools", "chat_node")
 
-# Database connection and checkpointer
-connection = sqlite3.connect(database="chatbot.db", check_same_thread=False)
-check_pointer = SqliteSaver(connection)
+# Database checkpointer
+check_pointer = MySQLCheckpointSaver()
 
 # Compile the chatbot with checkpointer
 chatbot = graph.compile(checkpointer=check_pointer)
 
-# Initialize thread metadata table
-cursor = connection.cursor()
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS thread_metadata (
-    thread_id TEXT PRIMARY KEY,
-    title TEXT
-)
-""")
-connection.commit()
+# Database session factory
+Session = DatabaseConfig.get_session_factory()
 
 
 # Thread management functions
@@ -107,28 +104,45 @@ connection.commit()
 def retrieve_all_threads():
     """Retrieve all thread IDs from the checkpointer"""
     all_threads = set()
-    for checkpoint in check_pointer.list(None):
-        all_threads.add(checkpoint.config["configurable"]["thread_id"])
+    try:
+        for checkpoint_tuple in check_pointer.list(None):
+            # checkpoint_tuple is a CheckpointTuple with .config attribute
+            all_threads.add(checkpoint_tuple.config["configurable"]["thread_id"])
+    except Exception as e:
+        print(f"Error retrieving threads: {e}")
     return list(all_threads)
 
 
 def save_thread_title(thread_id: str, title: str):
     """Save or update a thread's title in the database"""
-    cursor.execute("""
-    INSERT OR REPLACE INTO thread_metadata (thread_id, title)
-    VALUES (?, ?)
-    """, (thread_id, title))
-    connection.commit()
+    session = Session()
+    try:
+        existing = session.query(ThreadMetadata).filter_by(thread_id=thread_id).first()
+        if existing:
+            existing.title = title
+        else:
+            new_thread = ThreadMetadata(thread_id=thread_id, title=title)
+            session.add(new_thread)
+        session.commit()
+    finally:
+        session.close()
 
 
 def get_thread_title_from_db(thread_id: str) -> str | None:
     """Get a thread's title from the database"""
-    cursor.execute("SELECT title FROM thread_metadata WHERE thread_id=?", (thread_id,))
-    row = cursor.fetchone()
-    return row[0] if row else None
+    session = Session()
+    try:
+        thread = session.query(ThreadMetadata).filter_by(thread_id=thread_id).first()
+        return thread.title if thread else None
+    finally:
+        session.close()
 
 
 def get_all_thread_metadata():
     """Get all thread IDs and their titles as a dictionary"""
-    cursor.execute("SELECT thread_id, title FROM thread_metadata")
-    return dict(cursor.fetchall())
+    session = Session()
+    try:
+        threads = session.query(ThreadMetadata).all()
+        return {thread.thread_id: thread.title for thread in threads}
+    finally:
+        session.close()

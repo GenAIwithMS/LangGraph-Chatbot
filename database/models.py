@@ -1,0 +1,84 @@
+"""
+SQLAlchemy ORM Models for Chatbot Database
+"""
+from datetime import datetime
+from sqlalchemy import Column, String, Integer, TIMESTAMP, Text, LargeBinary, ForeignKeyConstraint, Index
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import func
+
+Base = declarative_base()
+
+
+class ThreadMetadata(Base):
+    """Thread metadata table - stores conversation thread information"""
+    __tablename__ = "thread_metadata"
+    
+    thread_id = Column(String(191), primary_key=True)
+    title = Column(String(255), nullable=False, default="New Chat")
+    created_at = Column(TIMESTAMP, default=func.current_timestamp())
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
+    
+    __table_args__ = (
+        Index("idx_created_at", "created_at"),
+        Index("idx_updated_at", "updated_at"),
+    )
+
+
+class DocumentMetadata(Base):
+    """Document metadata table - stores uploaded document information"""
+    __tablename__ = "document_metadata"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    thread_id = Column(String(191), nullable=False)
+    filename = Column(String(500), nullable=False)
+    documents_count = Column(Integer, nullable=False, default=0)
+    chunks_count = Column(Integer, nullable=False, default=0)
+    uploaded_at = Column(TIMESTAMP, default=func.current_timestamp())
+    
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["thread_id"],
+            ["thread_metadata.thread_id"],
+            ondelete="CASCADE"
+        ),
+        Index("idx_thread_id", "thread_id"),
+    )
+
+
+class Checkpoint(Base):
+    """Checkpoints table - stores LangGraph conversation state"""
+    __tablename__ = "checkpoints"
+    
+    thread_id = Column(String(191), primary_key=True)
+    checkpoint_ns = Column(String(191), primary_key=True, default="")
+    checkpoint_id = Column(String(191), primary_key=True)
+    parent_checkpoint_id = Column(String(191), nullable=True)
+    type = Column(String(128), nullable=True)
+    checkpoint = Column(LargeBinary, nullable=False)
+    meta = Column(LargeBinary, nullable=False)
+    
+    __table_args__ = (
+        Index("idx_parent", "thread_id", "checkpoint_ns", "parent_checkpoint_id"),
+    )
+
+
+class CheckpointWrite(Base):
+    """Checkpoint writes table - stores pending checkpoint writes"""
+    __tablename__ = "checkpoint_writes"
+    
+    thread_id = Column(String(191), primary_key=True)
+    checkpoint_ns = Column(String(191), primary_key=True, default="")
+    checkpoint_id = Column(String(191), primary_key=True)
+    task_id = Column(String(191), primary_key=True)
+    idx = Column(Integer, primary_key=True)
+    channel = Column(String(128), nullable=False)
+    type = Column(String(128), nullable=True)
+    value = Column(LargeBinary, nullable=True)
+    
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["thread_id", "checkpoint_ns", "checkpoint_id"],
+            ["checkpoints.thread_id", "checkpoints.checkpoint_ns", "checkpoints.checkpoint_id"],
+            ondelete="CASCADE"
+        ),
+    )
