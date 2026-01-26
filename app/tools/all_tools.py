@@ -3,16 +3,11 @@ from langchain_core.tools import tool
 from langchain_community.tools import BraveSearch
 import os
 
-
-
 brave_api = os.getenv("BRAVE_API_KEY")
 weather_api= os.getenv("WEATHER_API_KEY")
 stock_api= os.getenv("STOCK_API_KEY")
 
-
-
 search = BraveSearch.from_api_key(api_key=brave_api)
-
 
 @tool
 def stock_price(symbol: str):

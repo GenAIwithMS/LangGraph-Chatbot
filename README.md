@@ -1,6 +1,6 @@
 # AI Chatbot with LangGraph & RAG
 
-A sophisticated chatbot implementation built using LangGraph, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, and persistent storage.
+A sophisticated chatbot implementation built using LangGraph, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, and persistent MySQL storage.
 
 ## Features
 
@@ -8,7 +8,7 @@ A sophisticated chatbot implementation built using LangGraph, featuring a FastAP
 - **React Frontend**: ChatGPT-inspired UI with Tailwind CSS
 - **Multi-threaded Conversations**: Support for multiple chat threads with unique identifiers
 - **RAG (Retrieval Augmented Generation)**: PDF upload and document Q&A
-- **Persistent Storage**: SQLite backend for storing conversation history and checkpoints
+- **Persistent Storage**: MySQL database for storing conversation history and checkpoints
 - **Tool Integration**: Multiple tools for enhanced functionality:
   - Web Search (Brave API)
   - Weather Information (OpenWeather API)
@@ -19,8 +19,8 @@ A sophisticated chatbot implementation built using LangGraph, featuring a FastAP
 
 ### Backend
 - **Framework**: FastAPI + LangGraph
-- **Model**: Groq ChatGroq (qwen/qwen3-32b)
-- **Database**: SQLite with SqliteSaver checkpointer
+- **Model**: OpenAI GPT (via CanopyWave API)
+- **Database**: MySQL with custom checkpoint saver
 - **RAG**: FAISS + HuggingFace Embeddings
 - **Language**: Python 3.x
 
@@ -35,8 +35,9 @@ A sophisticated chatbot implementation built using LangGraph, featuring a FastAP
 
 - Python 3.8+
 - Node.js 18+ and npm
+- MySQL 5.7+ or MySQL 8.0+
 - API Keys (configured in `.env` file):
-  - GROQ_API_KEY
+  - OPENAI_API_KEY
   - BRAVE_API_KEY (for search)
   - OPENWEATHER_API_KEY (for weather)
   - ALPHA_VANTAGE_API_KEY (for stocks)
@@ -44,7 +45,33 @@ A sophisticated chatbot implementation built using LangGraph, featuring a FastAP
 
 ## Quick Start
 
-### Option 1: Use Start Script (Windows)
+### Step 1: Database Setup
+
+1. Make sure MySQL is installed and running
+2. Copy and configure environment variables:
+```bash
+cp .env.example .env
+```
+
+3. Edit `.env` with your MySQL credentials:
+```env
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=your_password
+MYSQL_DATABASE=chatbot_db
+```
+
+4. Initialize the database:
+```bash
+python -m database.init_db
+```
+
+See [database/README.md](database/README.md) for detailed database setup instructions.
+
+### Step 2: Start Application
+
+**Option 1: Use Start Script (Windows)**
 
 Simply double-click `start.bat` or run:
 ```bash
@@ -53,7 +80,7 @@ start.bat
 
 This will start both the backend (port 8000) and frontend (port 3000) automatically.
 
-### Option 2: Manual Start
+**Option 2: Manual Start**
 
 **1. Start Backend:**
 ```bash
@@ -74,18 +101,27 @@ npm run dev
 
 ## Configuration
 
-1. Create a `.env` file in the project root:
-```bash
-cp .env.example .env
-```
+Edit your `.env` file with the required API keys:
 
-2. Add your API keys:
 ```env
-GROQ_API_KEY=your_groq_api_key
+# OpenAI API Configuration
+OPENAI_API_KEY=your_openai_api_key
+
+# Tool API Keys
 BRAVE_API_KEY=your_brave_api_key
 OPENWEATHER_API_KEY=your_openweather_api_key
 ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key
-LANGSMITH_API_KEY=your_langsmith_key  # Optional
+
+# MySQL Database
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=your_mysql_password
+MYSQL_DATABASE=chatbot_db
+
+# Optional: LangSmith tracing
+LANGCHAIN_TRACING_V2=false
+LANGCHAIN_API_KEY=your_langsmith_key
 ```
 
 ## Project Structure
@@ -105,6 +141,12 @@ LANGSMITH_API_KEY=your_langsmith_key  # Optional
 │   │   └── thread_service.py    # Thread management
 │   └── tools/               # External API tools
 │       └── all_tools.py     # Search, weather, calc, stocks
+├── database/                # Database configuration
+│   ├── schema.sql          # MySQL schema
+│   ├── init_db.py          # Database initialization
+│   ├── config.py           # Database config
+│   ├── mysql_checkpoint.py # Custom MySQL checkpointer
+│   └── README.md           # Database setup guide
 ├── frontend/                # React frontend
 │   ├── src/
 │   │   ├── components/      # React components
