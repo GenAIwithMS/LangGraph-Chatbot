@@ -1,14 +1,14 @@
 from typing import Optional, List, Dict, Any
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from app.services.chatbot_service import (
+from backend.app.services.chatbot import (
     chatbot,
     retrieve_all_threads,
     save_thread_title,
     get_thread_title_from_db,
     get_all_thread_metadata
 )
-from app.services.thread_service import generate_thread_id, generate_id_name
-from app.services.rag_service import has_document
+from backend.app.services.thread import generate_thread_id, generate_id_name
+from backend.app.services.rag import has_document
 
 class ChatService:
     """Service class to handle chat-related business logic"""

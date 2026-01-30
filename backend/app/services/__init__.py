@@ -2,10 +2,10 @@
 Services package for business logic
 """
 
-from .chat_service import ChatService
-from .rag_service import ingest_pdf, retrieve_from_document, has_document, get_document_info
-from .thread_service import generate_thread_id, generate_id_name, generate_thread_title
-from .chatbot_service import (
+from .chat import ChatService
+from .rag import ingest_pdf, retrieve_from_document, has_document, get_document_info
+from .thread import generate_thread_id, generate_id_name, generate_thread_title
+from .chatbot import (
     chatbot,
     retrieve_all_threads,
     save_thread_title,

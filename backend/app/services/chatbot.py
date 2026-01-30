@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from app.tools.all_tools import search, weather, calculator, stock_price
-from app.services.rag_service import has_document, retrieve_from_document
+from backend.app.services.rag import has_document, retrieve_from_document
 from database.config import DatabaseConfig
 from database.mysql_checkpoint import MySQLCheckpointSaver
 from database.models import ThreadMetadata
