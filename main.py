@@ -4,7 +4,7 @@ Run this file to start the LangGraph Chatbot API server
 """
 
 import uvicorn
-from app import create_app
+from backend.app import create_app
 
 app = create_app()
 

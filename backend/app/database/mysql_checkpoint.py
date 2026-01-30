@@ -1,7 +1,3 @@
-"""
-MySQL Checkpoint Manager for LangGraph using SQLAlchemy
-Provides checkpoint storage using MySQL with ORM
-"""
 import pickle
 from typing import Optional, Any, Iterator, NamedTuple
 from sqlalchemy import select
