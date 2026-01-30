@@ -2,8 +2,8 @@ import pickle
 from typing import Optional, Any, Iterator, NamedTuple
 from sqlalchemy import select
 from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, CheckpointTuple
-from database.config import DatabaseConfig
-from database.models import Checkpoint as CheckpointModel, CheckpointWrite as CheckpointWriteModel
+from app.database.config import DatabaseConfig
+from app.database.models import Checkpoint as CheckpointModel, CheckpointWrite as CheckpointWriteModel
 
 
 class MySQLCheckpointSaver(BaseCheckpointSaver):

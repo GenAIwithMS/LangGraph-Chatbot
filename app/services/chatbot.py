@@ -4,29 +4,33 @@ from typing import TypedDict, Annotated
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langgraph.graph.message import add_messages
 from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
-from app.tools.all_tools import search, weather, calculator, stock_price
-from backend.app.services.rag import has_document, retrieve_from_document
-from database.config import DatabaseConfig
-from database.mysql_checkpoint import MySQLCheckpointSaver
-from database.models import ThreadMetadata
+from app.tools import Search, Weather, Calculator, Stock_price
+from app.services.rag import has_document, retrieve_from_document
+from app.database import DatabaseConfig,MySQLCheckpointSaver,ThreadMetadata
+# from app.database.mysql_checkpoint import 
+# from app.database.models import 
 import os
 
 load_dotenv()
 
-api = os.getenv("OPENAI_API_KEY")
+# api = os.getenv("OPENAI_API_KEY")
+api = os.getenv("GROQ_API_KEY")
 
-
-
-model = ChatOpenAI(
+model = ChatGroq(
     model="openai/gpt-oss-120b",
-    openai_api_key=api,
-    base_url="https://api.canopywave.io/v1"
+    api_key=api
     )
+# model = ChatOpenAI(
+#     model="openai/gpt-oss-120b",
+#     openai_api_key=api,
+#     base_url="https://api.canopywave.io/v1"
+#     )
 
 # Available tools for the chatbot
-all_tools = [search, weather, calculator, stock_price]
+all_tools = [Search, Weather, Calculator, Stock_price]
 
 
 class Chatstate(TypedDict):

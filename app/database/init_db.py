@@ -1,7 +1,7 @@
 """Database Initialization Script"""
 from sqlalchemy import create_engine, text
-from database.config import DatabaseConfig
-from database.models import Base
+from app.database import DatabaseConfig
+from app.database.models import Base
 
 
 def init_database():

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.router.chat import chat_router
 from app.router.health import health_router
-from database.init_db import init_database
+from app.database.init_db import init_database
 
 
 def create_app():
