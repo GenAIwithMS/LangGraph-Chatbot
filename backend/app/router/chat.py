@@ -18,8 +18,8 @@ from app.schema.models import (
     DocumentQueryResponse,
     DocumentInfoResponse
 )
-from app.services.chat_service import ChatService
-from app.services.rag_service import ingest_pdf, retrieve_from_document, has_document, get_document_info
+from backend.app.services.chat import ChatService
+from backend.app.services.rag import ingest_pdf, retrieve_from_document, has_document, get_document_info
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 
@@ -106,7 +106,7 @@ async def get_thread_history(thread_id: str):
      
         # The thread exists if it's in the thread metadata
         if not messages:
-            from app.services.chatbot_service import get_thread_title_from_db
+            from backend.app.services.chatbot import get_thread_title_from_db
             thread_exists = get_thread_title_from_db(thread_id) is not None
             
             if not thread_exists:
@@ -220,8 +220,9 @@ async def query_document(request: DocumentQueryRequest):
         # Generate answer using the context
         context_text = "\n\n".join(retrieval_result["context"])
         
-        api = os.getenv("OPENAI_API_KEY")
-        llm = ChatOpenAI(model="openai/gpt-oss-120b", openai_api_key=api, base_url="https://api.canopywave.io/v1")
+        api = os.getenv("GROQ_API_KEY")
+        # llm = ChatOpenAI(model="openai/gpt-oss-120b", openai_api_key=api, base_url="https://api.canopywave.io/v1")
+        llm = ChatGroq(model="groq/llama3-70b-chat", openai_api_key=api)
         prompt = f"""Based on the following context from a document, answer the question.
 
 Context:
