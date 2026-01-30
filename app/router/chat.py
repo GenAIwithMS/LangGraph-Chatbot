@@ -18,8 +18,8 @@ from app.schema.models import (
     DocumentQueryResponse,
     DocumentInfoResponse
 )
-from backend.app.services.chat import ChatService
-from backend.app.services.rag import ingest_pdf, retrieve_from_document, has_document, get_document_info
+from app.services.chat import ChatService
+from app.services.rag import ingest_pdf, retrieve_from_document, has_document, get_document_info
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 
@@ -106,7 +106,7 @@ async def get_thread_history(thread_id: str):
      
         # The thread exists if it's in the thread metadata
         if not messages:
-            from backend.app.services.chatbot import get_thread_title_from_db
+            from app.services.chatbot import get_thread_title_from_db
             thread_exists = get_thread_title_from_db(thread_id) is not None
             
             if not thread_exists:
