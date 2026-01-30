@@ -1,18 +1,25 @@
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import uuid
 import os
 
 load_dotenv()
-api = os.getenv("OPENAI_API_KEY")
+# api = os.getenv("OPENAI_API_KEY")
 
-model = ChatOpenAI(
+# model = ChatOpenAI(
+#     model="openai/gpt-oss-120b",
+#     openai_api_key=api,
+#     base_url="https://api.canopywave.io/v1"
+#     )
+
+api = os.getenv("GROQ_API_KEY")
+
+model = ChatGroq(
     model="openai/gpt-oss-120b",
-    openai_api_key=api,
-    base_url="https://api.canopywave.io/v1"
+    api_key=api
     )
-
 
 class StructuredModel(BaseModel):
     title: str = Field(description="A short chat title (<= 5 words).")

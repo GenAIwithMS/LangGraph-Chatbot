@@ -1,8 +1,3 @@
-"""
-FastAPI Server Entry Point
-Run this file to start the LangGraph Chatbot API server
-"""
-
 import uvicorn
 from app import create_app
 

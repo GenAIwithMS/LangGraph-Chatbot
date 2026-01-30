@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from typing import Optional
 import json
-from langchain_openai import ChatOpenAI
 import os
 from app.schema.models import (
     ChatRequest,
@@ -222,7 +221,7 @@ async def query_document(request: DocumentQueryRequest):
         
         api = os.getenv("GROQ_API_KEY")
         # llm = ChatOpenAI(model="openai/gpt-oss-120b", openai_api_key=api, base_url="https://api.canopywave.io/v1")
-        llm = ChatGroq(model="groq/llama3-70b-chat", openai_api_key=api)
+        llm = ChatGroq(model="openai/gpt-oss-120b", openai_api_key=api)
         prompt = f"""Based on the following context from a document, answer the question.
 
 Context:
