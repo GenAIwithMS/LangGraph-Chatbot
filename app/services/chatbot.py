@@ -47,6 +47,8 @@ def chat_node(state: Chatstate):
     thread_id = state.get("thread_id")
     has_doc = state.get("has_document", False)
     
+    print(f"[DEBUG] chat_node - thread_id: {thread_id}, has_document: {has_doc}")
+    
     # Only check document if state indicates one exists (optimization)
     if thread_id and has_doc:
         # Get the last user message to use as query
@@ -60,10 +62,12 @@ def chat_node(state: Chatstate):
         if last_user_message:
             try:
                 retrieval_result = retrieve_from_document(last_user_message, thread_id)
+                print(f"[DEBUG] Retrieval result: {retrieval_result.keys() if isinstance(retrieval_result, dict) else 'Not a dict'}")
                 
                 # If retrieval was successful, prepend context to messages
                 if "context" in retrieval_result and retrieval_result["context"]:
                     context_text = "\n\n".join(retrieval_result["context"])
+                    print(f"[DEBUG] Adding document context ({len(retrieval_result['context'])} chunks)")
                     context_message = SystemMessage(
                         content=f"""You have access to information from an uploaded document. Use this context to answer the user's question if relevant:
 
@@ -74,8 +78,12 @@ If the user's question is related to the document, base your answer on this cont
                     )
                     # Insert context before the last user message
                     messages = list(messages[:-1]) + [context_message, messages[-1]]
+                else:
+                    print(f"[DEBUG] No context retrieved or empty context")
             except Exception as e:
                 print(f"Error retrieving document context: {e}")
+    else:
+        print(f"[DEBUG] Skipping document retrieval - thread_id: {thread_id}, has_doc: {has_doc}")
     
     model_with_tools = model.bind_tools(all_tools)
     response = model_with_tools.invoke(messages)

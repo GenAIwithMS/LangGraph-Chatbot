@@ -96,7 +96,7 @@ function App() {
     try {
       setUploadingPDF(true);
       const response = await chatService.uploadPDF(currentThreadId, file);
-      alert(`PDF uploaded successfully! ${response.chunks_created} chunks created.`);
+      alert(`PDF uploaded successfully! ${response.chunks} chunks created.`);
       await loadDocumentInfo();
     } catch (error) {
       console.error('Error uploading PDF:', error);
@@ -152,6 +152,7 @@ function App() {
           disabled={chatLoading || uploadingPDF || !currentThreadId}
           hasDocument={documentInfo?.has_document}
           documentInfo={documentInfo}
+          uploadingPDF={uploadingPDF}
         />
 
         {/* Error Display */}

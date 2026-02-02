@@ -22,6 +22,9 @@ def _get_retriever(thread_id: Optional[str]):
     """Fetch the retriever for a thread if available."""
     if thread_id and str(thread_id) in _THREAD_RETRIEVERS:
         return _THREAD_RETRIEVERS[str(thread_id)]
+    print(f"[DEBUG RAG] Retriever not found for thread {thread_id}")
+    print(f"[DEBUG RAG] Available threads: {list(_THREAD_RETRIEVERS.keys())}")
+    print(f"[DEBUG RAG] Metadata threads: {list(_THREAD_METADATA.keys())}")
     return None
 
 
@@ -81,8 +84,15 @@ def retrieve_from_document(query: str, thread_id: str) -> dict:
     Retrieve relevant information from the uploaded PDF for this chat thread.
     Returns context and metadata from the document.
     """
+    print(f"[DEBUG RAG] Attempting to retrieve for thread: {thread_id}")
     retriever = _get_retriever(thread_id)
     if retriever is None:
+        # Check if we have metadata but lost the retriever (server restart)
+        if str(thread_id) in _THREAD_METADATA:
+            return {
+                "error": "Document metadata exists but retriever was lost. Please re-upload the document.",
+                "query": query,
+            }
         return {
             "error": "No document indexed for this chat. Upload a PDF first.",
             "query": query,
@@ -90,12 +100,20 @@ def retrieve_from_document(query: str, thread_id: str) -> dict:
 
     # Use the retriever API to fetch relevant documents
     try:
+        print(f"[DEBUG RAG] Calling retriever.get_relevant_documents with query: {query[:50]}...")
         results = retriever.get_relevant_documents(query)
-    except AttributeError:
+        print(f"[DEBUG RAG] Successfully retrieved {len(results)} documents")
+    except AttributeError as ae:
+        print(f"[DEBUG RAG] AttributeError: {ae}, trying invoke method")
         try:
-            results = retriever.retrieve(query)
+            results = retriever.invoke(query)
+            print(f"[DEBUG RAG] Successfully retrieved {len(results)} documents via invoke")
         except Exception as e:
+            print(f"[DEBUG RAG] Invoke also failed: {e}")
             return {"error": f"Retriever invocation failed: {e}", "query": query}
+    except Exception as e:
+        print(f"[DEBUG RAG] Exception during retrieval: {type(e).__name__}: {e}")
+        return {"error": f"Retrieval failed: {e}", "query": query}
 
     context = [doc.page_content for doc in results]
     metadata = [getattr(doc, "metadata", {}) for doc in results]
@@ -110,9 +128,16 @@ def retrieve_from_document(query: str, thread_id: str) -> dict:
 
 def has_document(thread_id: str) -> bool:
     """Check if a thread has an uploaded document."""
-    return str(thread_id) in _THREAD_RETRIEVERS
+    has_retriever = str(thread_id) in _THREAD_RETRIEVERS
+    has_metadata = str(thread_id) in _THREAD_METADATA
+    print(f"[DEBUG RAG] has_document check - thread: {thread_id}, retriever: {has_retriever}, metadata: {has_metadata}")
+    # Return True only if we have the actual retriever
+    return has_retriever
 
 
 def get_document_info(thread_id: str) -> Optional[dict]:
     """Get metadata about the uploaded document for a thread."""
-    return _THREAD_METADATA.get(str(thread_id))
+    # Only return info if we have an actual retriever, not just stale metadata
+    if str(thread_id) in _THREAD_RETRIEVERS:
+        return _THREAD_METADATA.get(str(thread_id))
+    return None
