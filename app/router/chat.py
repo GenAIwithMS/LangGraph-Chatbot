@@ -85,14 +85,13 @@ async def get_threads():
     try:
         threads = ChatService.get_all_threads()
         
-        # Convert to response model
+        # Convert to response model (already sorted by updated_at)
         thread_responses = [
             ThreadResponse(thread_id=t["thread_id"], title=t["title"])
             for t in threads
         ]
         
-        # Reverse order to show newest first
-        return ThreadListResponse(threads=list(reversed(thread_responses)))
+        return ThreadListResponse(threads=thread_responses)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

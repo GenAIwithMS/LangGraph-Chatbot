@@ -132,10 +132,24 @@ def save_thread_title(thread_id: str, title: str):
         existing = session.query(ThreadMetadata).filter_by(thread_id=thread_id).first()
         if existing:
             existing.title = title
+            # updated_at will be automatically updated by onupdate trigger
         else:
             new_thread = ThreadMetadata(thread_id=thread_id, title=title)
             session.add(new_thread)
         session.commit()
+    finally:
+        session.close()
+
+
+def touch_thread(thread_id: str):
+    """Update the updated_at timestamp for a thread to mark recent activity"""
+    session = Session()
+    try:
+        existing = session.query(ThreadMetadata).filter_by(thread_id=thread_id).first()
+        if existing:
+            # Trigger the onupdate by setting a field
+            existing.title = existing.title
+            session.commit()
     finally:
         session.close()
 
@@ -151,10 +165,17 @@ def get_thread_title_from_db(thread_id: str) -> str | None:
 
 
 def get_all_thread_metadata():
-    """Get all thread IDs and their titles as a dictionary"""
+    """Get all thread IDs and their metadata as a dictionary"""
     session = Session()
     try:
-        threads = session.query(ThreadMetadata).all()
-        return {thread.thread_id: thread.title for thread in threads}
+        threads = session.query(ThreadMetadata).order_by(ThreadMetadata.updated_at.desc()).all()
+        return {
+            thread.thread_id: {
+                "title": thread.title,
+                "updated_at": thread.updated_at,
+                "created_at": thread.created_at
+            }
+            for thread in threads
+        }
     finally:
         session.close()
