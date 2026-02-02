@@ -45,29 +45,6 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
 
   return (
     <div className="border-t border-gray-700 bg-chat-bg">
-      {/* Document Upload Loader */}
-      {uploadingPDF && (
-        <div className="max-w-3xl mx-auto px-4 py-2">
-          <div className="flex items-center gap-2 text-sm text-blue-400 bg-blue-900/20 px-3 py-2 rounded-lg">
-            <Loader2 size={16} className="animate-spin" />
-            <span>Processing document...</span>
-          </div>
-        </div>
-      )}
-
-      {/* Document Status */}
-      {!uploadingPDF && hasDocument && documentInfo && (
-        <div className="max-w-3xl mx-auto px-4 py-2">
-          <div className="flex items-center gap-2 text-sm text-green-400 bg-green-900/20 px-3 py-2 rounded-lg">
-            <FileText size={16} />
-            <span>Document loaded: {documentInfo.filename}</span>
-            <span className="text-gray-400">
-              ({documentInfo.chunks} chunks)
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Input Area */}
       <div
         className={`max-w-3xl mx-auto px-4 py-3 ${
@@ -77,16 +54,34 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        <form onSubmit={handleSubmit} className="relative flex items-end gap-2">
-          {/* File Upload Button */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded-lg transition-colors"
-            title="Upload PDF"
-          >
-            <Paperclip size={20} />
-          </button>
+        <form onSubmit={handleSubmit} className="relative flex flex-col gap-2">
+          {/* Attachment Chip */}
+          {(uploadingPDF || (hasDocument && documentInfo)) && (
+            <div className="flex items-center gap-2 bg-[#1f2026] border border-gray-600 rounded-lg px-3 py-2 text-sm">
+              {uploadingPDF ? (
+                <Loader2 size={16} className="animate-spin text-blue-400" />
+              ) : (
+                <FileText size={16} className="text-blue-400" />
+              )}
+              <span className="text-gray-200 truncate">
+                {uploadingPDF ? 'Processing document...' : documentInfo?.filename}
+              </span>
+              {!uploadingPDF && (
+                <span className="text-xs text-gray-400">PDF</span>
+              )}
+            </div>
+          )}
+
+          <div className="relative flex items-end gap-2">
+            {/* File Upload Button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded-lg transition-colors"
+              title="Upload PDF"
+            >
+              <Paperclip size={20} />
+            </button>
           
           <input
             ref={fileInputRef}
@@ -100,44 +95,45 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
             className="hidden"
           />
 
-          {/* Text Input */}
-          <div className="flex-1 relative">
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
+            {/* Text Input */}
+            <div className="flex-1 relative">
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+                placeholder={
+                  isDragging 
+                    ? 'Drop PDF file here...' 
+                    : 'Send a message...'
                 }
-              }}
-              placeholder={
-                isDragging 
-                  ? 'Drop PDF file here...' 
-                  : 'Send a message...'
-              }
-              disabled={disabled}
-              className="w-full px-4 py-3 pr-12 bg-gray-700 text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              rows={1}
-              style={{
-                minHeight: '44px',
-                maxHeight: '200px',
-                height: 'auto',
-              }}
-              onInput={(e) => {
-                e.target.style.height = 'auto';
-                e.target.style.height = e.target.scrollHeight + 'px';
-              }}
-            />
+                disabled={disabled}
+                className="w-full px-4 py-3 pr-12 bg-gray-700 text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                rows={1}
+                style={{
+                  minHeight: '44px',
+                  maxHeight: '200px',
+                  height: 'auto',
+                }}
+                onInput={(e) => {
+                  e.target.style.height = 'auto';
+                  e.target.style.height = e.target.scrollHeight + 'px';
+                }}
+              />
 
-            {/* Send Button */}
-            <button
-              type="submit"
-              disabled={!message.trim() || disabled}
-              className="absolute right-2 bottom-2 p-2 text-gray-400 hover:text-white disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
-            >
-              <Send size={18} />
-            </button>
+              {/* Send Button */}
+              <button
+                type="submit"
+                disabled={!message.trim() || disabled}
+                className="absolute right-2 bottom-2 p-2 text-gray-400 hover:text-white disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send size={18} />
+              </button>
+            </div>
           </div>
         </form>
 

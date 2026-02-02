@@ -96,7 +96,9 @@ function App() {
     try {
       setUploadingPDF(true);
       const response = await chatService.uploadPDF(currentThreadId, file);
-      alert(`PDF uploaded successfully! ${response.chunks} chunks created.`);
+      if (response.thread_id && response.thread_id !== currentThreadId) {
+        setCurrentThreadId(response.thread_id);
+      }
       await loadDocumentInfo();
     } catch (error) {
       console.error('Error uploading PDF:', error);
