@@ -1,11 +1,13 @@
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from app.services.chatbot import (
     chatbot,
     retrieve_all_threads,
     save_thread_title,
     get_thread_title_from_db,
-    get_all_thread_metadata
+    get_all_thread_metadata,
+    touch_thread
 )
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
@@ -47,11 +49,17 @@ class ChatService:
         
         threads = []
         for tid in thread_ids:
-            title = metadata.get(tid, "New Chat")
+            thread_meta = metadata.get(tid, {})
+            title = thread_meta.get("title", "New Chat") if isinstance(thread_meta, dict) else thread_meta
+            updated_at = thread_meta.get("updated_at") if isinstance(thread_meta, dict) else None
             threads.append({
                 "thread_id": tid,
-                "title": title
+                "title": title,
+                "updated_at": updated_at
             })
+        
+        # Sort by updated_at descending (most recent first)
+        threads.sort(key=lambda x: x.get("updated_at") or datetime.min, reverse=True)
         
         return threads
     
@@ -102,6 +110,9 @@ class ChatService:
             )
             
             messages = final_state["messages"]
+            
+            # Update thread timestamp to show recent activity
+            touch_thread(thread_id)
             
             # Extract the last AI message
             ai_response = None
