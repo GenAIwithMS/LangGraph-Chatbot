@@ -95,7 +95,8 @@ class ChatService:
             final_state = chatbot.invoke(
                 {
                     "messages": [HumanMessage(content=message)],
-                    "has_document": doc_exists
+                    "has_document": doc_exists,
+                    "thread_id": thread_id
                 },
                 config=config
             )
@@ -136,7 +137,8 @@ class ChatService:
             for message_chunk, metadata in chatbot.stream(
                 {
                     "messages": [HumanMessage(content=message)],
-                    "has_document": doc_exists
+                    "has_document": doc_exists,
+                    "thread_id": thread_id
                 },
                 config=config,
                 stream_mode="messages",

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Send, Paperclip, FileText } from 'lucide-react';
+import { Send, Paperclip, FileText, Loader2 } from 'lucide-react';
 
-const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, documentInfo }) => {
+const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, documentInfo, uploadingPDF }) => {
   const [message, setMessage] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
@@ -45,8 +45,18 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
 
   return (
     <div className="border-t border-gray-700 bg-chat-bg">
+      {/* Document Upload Loader */}
+      {uploadingPDF && (
+        <div className="max-w-3xl mx-auto px-4 py-2">
+          <div className="flex items-center gap-2 text-sm text-blue-400 bg-blue-900/20 px-3 py-2 rounded-lg">
+            <Loader2 size={16} className="animate-spin" />
+            <span>Processing document...</span>
+          </div>
+        </div>
+      )}
+
       {/* Document Status */}
-      {hasDocument && documentInfo && (
+      {!uploadingPDF && hasDocument && documentInfo && (
         <div className="max-w-3xl mx-auto px-4 py-2">
           <div className="flex items-center gap-2 text-sm text-green-400 bg-green-900/20 px-3 py-2 rounded-lg">
             <FileText size={16} />
