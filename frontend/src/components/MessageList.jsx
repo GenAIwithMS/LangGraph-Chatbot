@@ -6,13 +6,23 @@ import { Loader2 } from 'lucide-react';
 
 const MessageList = ({ messages, loading }) => {
   const messagesEndRef = useRef(null);
+  const previousLengthRef = useRef(0);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
-    scrollToBottom();
+    const lastMessage = messages[messages.length - 1];
+    const isInitialLoad = previousLengthRef.current === 0 && messages.length > 0;
+    const isNewUserMessage =
+      messages.length > previousLengthRef.current && lastMessage?.type === 'human';
+
+    if (isInitialLoad || isNewUserMessage) {
+      scrollToBottom();
+    }
+
+    previousLengthRef.current = messages.length;
   }, [messages]);
 
   const renderMessage = (message, index) => {
