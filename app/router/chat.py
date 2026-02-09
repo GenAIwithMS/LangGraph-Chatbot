@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import StreamingResponse
-from typing import Optional
+from typing import Optional, List
 import json
 import os
 from app.schema.models import (
@@ -39,7 +39,7 @@ async def chat(request: ChatRequest):
         ChatService.get_or_create_thread_title(thread_id, request.message)
         
         # Send message and get response
-        result = ChatService.send_message(request.message, thread_id)
+        result = ChatService.send_message(request.message, thread_id, request.tools)
         
         return ChatResponse(**result)
     
@@ -47,22 +47,27 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@chat_router.post("/chat/stream")
-async def chat_stream(request: ChatRequest):
+@chat_router.get("/chat/stream")
+async def chat_stream(
+    message: str = Query(..., description="User message"),
+    thread_id: Optional[str] = Query(None, description="Thread ID"),
+    tools: Optional[str] = Query(None, description="Comma-separated list of tools")
+):
     try:
+        # Parse tools from comma-separated string
+        tools_list = tools.split(',') if tools else None
+        
         # Create new thread if not provided
-        if not request.thread_id:
+        if not thread_id:
             thread_id = ChatService.create_new_thread()
-        else:
-            thread_id = request.thread_id
         
         # Generate thread title from first message if needed
-        ChatService.get_or_create_thread_title(thread_id, request.message)
+        ChatService.get_or_create_thread_title(thread_id, message)
         
         def generate_stream():
             """Generator function for streaming responses"""
             try:
-                for chunk in ChatService.stream_message(request.message, thread_id):
+                for chunk in ChatService.stream_message(message, thread_id, tools_list):
                     # Send each chunk as JSON
                     yield f"data: {json.dumps(chunk)}\n\n"
                 

@@ -1,16 +1,68 @@
-import React, { useState, useRef } from 'react';
-import { Send, Paperclip, FileText, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Paperclip, FileText, Loader2, Wrench, Search, FileEdit, X } from 'lucide-react';
 
 const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, documentInfo, uploadingPDF }) => {
   const [message, setMessage] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [selectedTools, setSelectedTools] = useState([]);
   const fileInputRef = useRef(null);
+  const toolsMenuRef = useRef(null);
+
+  // Close tools menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(event.target) && 
+          !event.target.closest('button[title="Select Tools"]')) {
+        setShowToolsMenu(false);
+      }
+    };
+
+    if (showToolsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showToolsMenu]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
-      onSendMessage(message);
+      onSendMessage(message, selectedTools);
       setMessage('');
+      setSelectedTools([]);
+    }
+  };
+
+  const handleToolSelect = (tool) => {
+    if (!selectedTools.includes(tool)) {
+      setSelectedTools([...selectedTools, tool]);
+    }
+    setShowToolsMenu(false);
+  };
+
+  const handleRemoveTool = (tool) => {
+    setSelectedTools(selectedTools.filter(t => t !== tool));
+  };
+
+  const getToolIcon = (tool) => {
+    switch(tool) {
+      case 'search':
+        return <Search size={14} />;
+      case 'blogs':
+        return <FileEdit size={14} />;
+      default:
+        return null;
+    }
+  };
+
+  const getToolLabel = (tool) => {
+    switch(tool) {
+      case 'search':
+        return 'Search';
+      case 'blogs':
+        return 'Blogs';
+      default:
+        return tool;
     }
   };
 
@@ -95,7 +147,7 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
             className="hidden"
           />
 
-            {/* Text Input */}
+            {/* Text Input with Tools Inside */}
             <div className="flex-1 relative">
               <textarea
                 value={message}
@@ -112,7 +164,7 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
                     : 'Send a message...'
                 }
                 disabled={disabled}
-                className="w-full px-4 py-3 pr-12 bg-gray-700 text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 pb-10 pr-12 bg-gray-700 text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
                 style={{
                   minHeight: '44px',
@@ -124,6 +176,64 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
                   e.target.style.height = e.target.scrollHeight + 'px';
                 }}
               />
+
+              {/* Tools Section - Inside Input */}
+              <div className="absolute bottom-2 left-2 flex items-center gap-1">
+                {/* Tools Menu Button */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowToolsMenu(!showToolsMenu)}
+                    className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-200 hover:bg-gray-600 rounded transition-colors"
+                    title="Select Tools"
+                  >
+                    <Wrench size={16} />
+                  </button>
+
+                  {/* Tools Dropdown Menu */}
+                  {showToolsMenu && (
+                    <div 
+                      ref={toolsMenuRef}
+                      className="absolute bottom-full left-0 mb-2 w-32 bg-gray-800 rounded-lg shadow-lg z-50 py-1 border border-gray-700"
+                    >
+                      <button
+                        onClick={() => handleToolSelect('search')}
+                        disabled={selectedTools.includes('search')}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-700 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Search size={14} className="text-blue-400" />
+                        <span className="text-gray-200">Search</span>
+                      </button>
+                      <button
+                        onClick={() => handleToolSelect('blogs')}
+                        disabled={selectedTools.includes('blogs')}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-700 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FileEdit size={14} className="text-purple-400" />
+                        <span className="text-gray-200">Blogs</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Tools Chips */}
+                {selectedTools.map((tool) => (
+                  <div
+                    key={tool}
+                    className="group flex items-center gap-1 bg-gray-600 border border-gray-500 rounded px-1.5 py-0.5 text-xs"
+                  >
+                    {getToolIcon(tool)}
+                    <span className="text-gray-200">{getToolLabel(tool)}</span>
+                    <button
+                      onClick={() => handleRemoveTool(tool)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-500 rounded transition-all"
+                      title="Remove tool"
+                    >
+                      <X size={10} className="text-gray-300" />
+                    </button>
+                  </div>
+                ))}
+              </div>
 
               {/* Send Button */}
               <button

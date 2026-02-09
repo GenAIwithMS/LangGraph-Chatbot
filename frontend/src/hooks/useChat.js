@@ -5,6 +5,7 @@ export const useChat = (threadId) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [streamingProgress, setStreamingProgress] = useState(null);
 
   useEffect(() => {
     if (threadId) {
@@ -30,7 +31,28 @@ export const useChat = (threadId) => {
     }
   };
 
-  const sendMessage = async (message) => {
+  const updateProgressStep = (stepLabel, status) => {
+    setStreamingProgress(prev => {
+      if (!prev) return null;
+      
+      const stepIndex = prev.steps.findIndex(s => s.label === stepLabel);
+      if (stepIndex === -1) return prev;
+      
+      const newSteps = [...prev.steps];
+      newSteps[stepIndex] = { ...newSteps[stepIndex], status };
+      
+      // Mark previous steps as completed
+      for (let i = 0; i < stepIndex; i++) {
+        if (newSteps[i].status !== 'completed') {
+          newSteps[i] = { ...newSteps[i], status: 'completed' };
+        }
+      }
+      
+      return { ...prev, steps: newSteps };
+    });
+  };
+
+  const sendMessage = async (message, tools = []) => {
     if (!threadId || !message.trim()) return;
 
     try {
@@ -41,11 +63,103 @@ export const useChat = (threadId) => {
         type: 'human',
         content: message,
         timestamp: new Date().toISOString(),
+        tools: tools.length > 0 ? tools : undefined,
       };
       setMessages(prev => [...prev, userMessage]);
 
-      // Send to backend
-      const response = await chatService.sendMessage(threadId, message);
+      // Initialize streaming progress if using blogs tool
+      if (tools.includes('blogs')) {
+        setStreamingProgress({
+          isStreaming: true,
+          toolName: 'blogs',
+          steps: [
+            { label: 'Routing...', status: 'in-progress' },
+            { label: 'Researching...', status: 'pending' },
+            { label: 'Planning...', status: 'pending' },
+            { label: 'Writing sections...', status: 'pending' },
+            { label: 'Finalizing...', status: 'pending' },
+          ],
+        });
+        
+        // Use streaming endpoint
+        let aiResponse = '';
+        
+        const handleMessage = (data) => {
+          if (data.message_type === 'progress') {
+            // Update progress based on node
+            if (data.node === 'router') {
+              updateProgressStep('Routing...', 'completed');
+              updateProgressStep('Researching...', 'in-progress');
+              setStreamingProgress(prev => {
+                if (!prev) return null;
+                const newSteps = [...prev.steps];
+                const idx = newSteps.findIndex(s => s.label === 'Routing...');
+                if (idx !== -1) newSteps[idx] = { ...newSteps[idx], details: data.content };
+                return { ...prev, steps: newSteps };
+              });
+            } else if (data.node === 'research') {
+              updateProgressStep('Researching...', 'completed');
+              updateProgressStep('Planning...', 'in-progress');
+              setStreamingProgress(prev => {
+                if (!prev) return null;
+                const newSteps = [...prev.steps];
+                const idx = newSteps.findIndex(s => s.label === 'Researching...');
+                if (idx !== -1) newSteps[idx] = { ...newSteps[idx], details: data.content };
+                return { ...prev, steps: newSteps };
+              });
+            } else if (data.node === 'orchestrator') {
+              updateProgressStep('Planning...', 'completed');
+              updateProgressStep('Writing sections...', 'in-progress');
+              setStreamingProgress(prev => {
+                if (!prev) return null;
+                const newSteps = [...prev.steps];
+                const idx = newSteps.findIndex(s => s.label === 'Planning...');
+                if (idx !== -1) newSteps[idx] = { ...newSteps[idx], details: data.content };
+                return { ...prev, steps: newSteps };
+              });
+            } else if (data.node === 'worker') {
+              // Keep writing in progress, just add count
+              setStreamingProgress(prev => {
+                if (!prev) return null;
+                const newSteps = [...prev.steps];
+                const idx = newSteps.findIndex(s => s.label === 'Writing sections...');
+                if (idx !== -1) {
+                  const currentCount = newSteps[idx].sectionCount || 0;
+                  newSteps[idx] = { ...newSteps[idx], sectionCount: currentCount + 1, details: `${currentCount + 1} sections completed` };
+                }
+                return { ...prev, steps: newSteps };
+              });
+            }
+          } else if (data.message_type === 'ai') {
+            aiResponse += data.content;
+            updateProgressStep('Writing sections...', 'completed');
+            updateProgressStep('Finalizing...', 'completed');
+          }
+          
+          if (data.done) {
+            // Add final AI message
+            setMessages(prev => [...prev, {
+              type: 'ai',
+              content: aiResponse,
+              timestamp: new Date().toISOString(),
+            }]);
+            setStreamingProgress(null);
+            setLoading(false);
+          }
+        };
+        
+        const handleError = (error) => {
+          setError('Streaming error occurred');
+          setStreamingProgress(null);
+          setLoading(false);
+        };
+        
+        chatService.streamMessage(threadId, message, tools, handleMessage, handleError);
+        return;
+      }
+
+      // Non-streaming path for other tools
+      const response = await chatService.sendMessage(threadId, message, tools);
       
       // Replace with actual response
       setMessages(prev => [
@@ -62,8 +176,11 @@ export const useChat = (threadId) => {
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);
+      setStreamingProgress(null);
     } finally {
-      setLoading(false);
+      if (!tools.includes('blogs')) {
+        setLoading(false);
+      }
     }
   };
 
@@ -73,5 +190,6 @@ export const useChat = (threadId) => {
     error,
     sendMessage,
     loadMessages,
+    streamingProgress,
   };
 };

@@ -7,6 +7,7 @@ class ChatRequest(BaseModel):
     
     message: str = Field(..., description="User message to send to the chatbot")
     thread_id: Optional[str] = Field(None, description="Thread ID for conversation continuity")
+    tools: Optional[List[str]] = Field(None, description="List of tools to use (e.g., ['search', 'blogs'])")
 
 
 class ChatResponse(BaseModel):
