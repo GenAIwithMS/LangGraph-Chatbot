@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from app.services.chatbot import (
     chatbot,
@@ -89,13 +89,51 @@ class ChatService:
             return []
     
     @staticmethod
-    def send_message(message: str, thread_id: str) -> Dict[str, Any]:
+    def send_message(message: str, thread_id: str, tools: Optional[List[str]] = None) -> Dict[str, Any]:
         config = {
             "configurable": {"thread_id": thread_id},
             "metadata": {"thread_id": thread_id}
         }
         
         try:
+            # If blogs tool is requested, use the blog app
+            if tools and "blogs" in tools:
+                try:
+                    from app.tools.blogs.graph import app as blog_app
+                    
+                    blog_state = {
+                        "topic": message,
+                        "as_of": date.today().isoformat(),
+                    }
+                    
+                    final_state = blog_app.invoke(blog_state)
+                    
+                    # Update thread timestamp
+                    touch_thread(thread_id)
+                    
+                    return {
+                        "response": final_state.get("final", "Blog generated successfully"),
+                        "thread_id": thread_id,
+                        "tool_used": "blogs"
+                    }
+                except Exception as blog_error:
+                    error_msg = str(blog_error)
+                    print(f"Error using blog tool: {error_msg}")
+                    
+                    # Provide user-friendly error messages
+                    if "name resolution failed" in error_msg or "503" in error_msg:
+                        return {
+                            "response": "⚠️ **Blog Generation Failed**\n\nThe blog generation service is currently unavailable (network connection issue). This could be due to:\n- External API service is down\n- Network connectivity issues\n- DNS resolution problems\n\nPlease try again later or use the regular chat without the blog tool.",
+                            "thread_id": thread_id,
+                            "tool_used": "blogs"
+                        }
+                    else:
+                        return {
+                            "response": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog:\n```\n{error_msg}\n```\n\nPlease try again or use the regular chat without the blog tool.",
+                            "thread_id": thread_id,
+                            "tool_used": "blogs"
+                        }
+            
             # Check if thread has a document
             doc_exists = has_document(thread_id)
             
@@ -135,13 +173,81 @@ class ChatService:
             raise Exception(f"Failed to send message: {str(e)}")
     
     @staticmethod
-    def stream_message(message: str, thread_id: str):
+    def stream_message(message: str, thread_id: str, tools: Optional[List[str]] = None):
         config = {
             "configurable": {"thread_id": thread_id},
             "metadata": {"thread_id": thread_id}
         }
         
         try:
+            # If blogs tool is requested, stream the blog generation process
+            if tools and "blogs" in tools:
+                try:
+                    from app.tools.blogs.graph import app as blog_app
+                    
+                    blog_state = {
+                        "topic": message,
+                        "as_of": date.today().isoformat(),
+                    }
+                    
+                    for event in blog_app.stream(blog_state, stream_mode="updates"):
+                        for node_name, node_output in event.items():
+                            # Stream progress updates for different nodes
+                            if node_name == "router":
+                                yield {
+                                    "content": f"✓ Routing complete - Mode: {node_output.get('mode', 'unknown')}",
+                                    "message_type": "progress",
+                                    "node": "router"
+                                }
+                            elif node_name == "research":
+                                evidence_count = len(node_output.get('evidence', []))
+                                yield {
+                                    "content": f"✓ Research complete - Found {evidence_count} sources",
+                                    "message_type": "progress",
+                                    "node": "research"
+                                }
+                            elif node_name == "orchestrator":
+                                plan = node_output.get('plan')
+                                if plan:
+                                    yield {
+                                        "content": f"✓ Planning complete - {len(plan.tasks)} sections planned",
+                                        "message_type": "progress",
+                                        "node": "orchestrator"
+                                    }
+                            elif node_name == "worker":
+                                yield {
+                                    "content": "✓ Section written",
+                                    "message_type": "progress",
+                                    "node": "worker"
+                                }
+                            elif node_name == "reducer":
+                                if 'final' in node_output:
+                                    yield {
+                                        "content": node_output['final'],
+                                        "message_type": "ai",
+                                        "node": "final"
+                                    }
+                    
+                    # Update thread timestamp
+                    touch_thread(thread_id)
+                    return
+                except Exception as blog_error:
+                    error_msg = str(blog_error)
+                    print(f"Error streaming blog tool: {error_msg}")
+                    
+                    # Provide user-friendly error messages
+                    if "name resolution failed" in error_msg or "503" in error_msg:
+                        yield {
+                            "content": "⚠️ **Blog Generation Failed**\n\nThe blog generation service is currently unavailable (network connection issue). This could be due to:\n- External API service is down\n- Network connectivity issues\n- DNS resolution problems\n\nPlease try again later or use the regular chat without the blog tool.",
+                            "message_type": "ai"
+                        }
+                    else:
+                        yield {
+                            "content": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog:\n```\n{error_msg}\n```\n\nPlease try again or use the regular chat without the blog tool.",
+                            "message_type": "ai"
+                        }
+                    return
+            
             # Check if thread has a document
             doc_exists = has_document(thread_id)
             

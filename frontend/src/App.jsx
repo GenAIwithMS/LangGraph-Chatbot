@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
+import ProgressSidebar from './components/ProgressSidebar';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { chatService } from './services/api';
@@ -27,6 +28,7 @@ function App() {
     error: chatError,
     sendMessage,
     loadMessages,
+    streamingProgress,
   } = useChat(currentThreadId);
 
   // Load document info when thread changes
@@ -79,8 +81,8 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (message) => {
-    await sendMessage(message);
+  const handleSendMessage = async (message, tools = []) => {
+    await sendMessage(message, tools);
     // Refresh threads to update titles if it's a new conversation
     if (messages.length === 0) {
       fetchThreads();
@@ -136,33 +138,44 @@ function App() {
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-screen">
-        {/* Header */}
-        <div className="flex-shrink-0 border-b border-gray-700 px-4 py-3 bg-chat-bg">
-          <div className="max-w-3xl mx-auto">
-            {/* Empty header or add logo/branding here if needed */}
+      <div className="flex-1 flex h-screen relative">
+        {/* Chat Section */}
+        <div className="flex-1 flex flex-col">
+          {/* Header */}
+          <div className="flex-shrink-0 border-b border-gray-700 px-4 py-3 bg-chat-bg">
+            <div className="max-w-3xl mx-auto">
+              {/* Empty header or add logo/branding here if needed */}
+            </div>
           </div>
+
+          {/* Messages */}
+          <MessageList messages={messages} loading={chatLoading} />
+
+          {/* Input */}
+          <MessageInput
+            onSendMessage={handleSendMessage}
+            onUploadPDF={handleUploadPDF}
+            disabled={chatLoading || uploadingPDF || !currentThreadId}
+            hasDocument={documentInfo?.has_document}
+            documentInfo={documentInfo}
+            uploadingPDF={uploadingPDF}
+          />
+
+          {/* Error Display */}
+          {(threadsError || chatError) && (
+            <div className="fixed bottom-20 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg">
+              {threadsError || chatError}
+            </div>
+          )}
         </div>
 
-        {/* Messages */}
-        <MessageList messages={messages} loading={chatLoading} />
-
-        {/* Input */}
-        <MessageInput
-          onSendMessage={handleSendMessage}
-          onUploadPDF={handleUploadPDF}
-          disabled={chatLoading || uploadingPDF || !currentThreadId}
-          hasDocument={documentInfo?.has_document}
-          documentInfo={documentInfo}
-          uploadingPDF={uploadingPDF}
+        {/* Progress Sidebar */}
+        <ProgressSidebar 
+          streamingProgress={streamingProgress}
+          onClose={() => {
+            // Optional: allow closing the sidebar while still processing
+          }}
         />
-
-        {/* Error Display */}
-        {(threadsError || chatError) && (
-          <div className="fixed bottom-20 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg">
-            {threadsError || chatError}
-          </div>
-        )}
       </div>
     </div>
   );

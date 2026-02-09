@@ -11,18 +11,20 @@ const api = axios.create({
 
 export const chatService = {
   // Send a message to the chatbot
-  sendMessage: async (threadId, message) => {
+  sendMessage: async (threadId, message, tools = []) => {
     const response = await api.post('/chat', {
       thread_id: threadId,
       message: message,
+      tools: tools,
     });
     return response.data;
   },
 
   // Stream messages (using EventSource for SSE)
-  streamMessage: (threadId, message, onMessage, onError) => {
+  streamMessage: (threadId, message, tools = [], onMessage, onError) => {
+    const toolsParam = tools.length > 0 ? `&tools=${tools.join(',')}` : '';
     const eventSource = new EventSource(
-      `${API_BASE_URL}/chat/stream?thread_id=${threadId}&message=${encodeURIComponent(message)}`
+      `${API_BASE_URL}/chat/stream?thread_id=${threadId}&message=${encodeURIComponent(message)}${toolsParam}`
     );
 
     eventSource.onmessage = (event) => {
