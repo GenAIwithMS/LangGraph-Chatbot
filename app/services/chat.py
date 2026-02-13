@@ -281,3 +281,59 @@ class ChatService:
         except Exception as e:
             print(f"Error updating title: {e}")
             return False
+    
+    @staticmethod
+    def delete_thread(thread_id: str) -> bool:
+        """Delete a thread and all its associated data"""
+        from app.database import DatabaseConfig, ThreadMetadata, DocumentMetadata, Checkpoint, CheckpointWrite
+        from app.services.rag import _thread_paths
+        import os
+        
+        session = DatabaseConfig.get_session_factory()()
+        try:
+            # Delete from database tables (cascade will handle related records)
+            
+            # Delete checkpoints and checkpoint writes
+            session.query(CheckpointWrite).filter_by(thread_id=thread_id).delete()
+            session.query(Checkpoint).filter_by(thread_id=thread_id).delete()
+            
+            # Delete document metadata (this should cascade from thread_metadata but let's be explicit)
+            session.query(DocumentMetadata).filter_by(thread_id=thread_id).delete()
+            
+            # Delete thread metadata
+            session.query(ThreadMetadata).filter_by(thread_id=thread_id).delete()
+            
+            session.commit()
+            
+            # Clean up storage files (PDF and metadata JSON)
+            try:
+                pdf_path, meta_path = _thread_paths(thread_id)
+                if os.path.exists(pdf_path):
+                    os.remove(pdf_path)
+                    print(f"Deleted PDF file: {pdf_path}")
+                if os.path.exists(meta_path):
+                    os.remove(meta_path)
+                    print(f"Deleted metadata file: {meta_path}")
+            except Exception as e:
+                print(f"Warning: Failed to delete storage files for thread {thread_id}: {e}")
+                # Don't fail the whole operation if file cleanup fails
+            
+            # Clear any in-memory caches
+            try:
+                from app.services.rag import _THREAD_RETRIEVERS, _THREAD_METADATA
+                if thread_id in _THREAD_RETRIEVERS:
+                    del _THREAD_RETRIEVERS[thread_id]
+                if thread_id in _THREAD_METADATA:
+                    del _THREAD_METADATA[thread_id]
+            except Exception as e:
+                print(f"Warning: Failed to clear thread cache for {thread_id}: {e}")
+            
+            print(f"Successfully deleted thread: {thread_id}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            print(f"Error deleting thread {thread_id}: {e}")
+            return False
+        finally:
+            session.close()

@@ -73,6 +73,12 @@ export const chatService = {
     return response.data;
   },
 
+  // Delete thread
+  deleteThread: async (threadId) => {
+    const response = await api.delete(`/threads/${threadId}`);
+    return response.data;
+  },
+
   // Upload PDF
   uploadPDF: async (threadId, file) => {
     const formData = new FormData();

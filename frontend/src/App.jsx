@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ProgressSidebar from './components/ProgressSidebar';
+import ConfirmationModal from './components/ConfirmationModal';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { chatService } from './services/api';
@@ -12,6 +13,8 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [documentInfo, setDocumentInfo] = useState(null);
   const [uploadingPDF, setUploadingPDF] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [threadToDelete, setThreadToDelete] = useState(null);
 
   const {
     threads,
@@ -65,20 +68,43 @@ function App() {
     setIsSidebarOpen(false);
   };
 
-  const handleThreadDelete = async (threadId) => {
-    if (confirm('Are you sure you want to delete this chat?')) {
+  const handleThreadDelete = (threadId) => {
+    setThreadToDelete(threadId);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteThread = async () => {
+    if (!threadToDelete) return;
+    
+    try {
+      // Call the delete API
+      await chatService.deleteThread(threadToDelete);
+      
       // If deleting current thread, switch to another or create new
-      if (threadId === currentThreadId) {
-        const remainingThreads = threads.filter(t => t.thread_id !== threadId);
+      if (threadToDelete === currentThreadId) {
+        const remainingThreads = threads.filter(t => t.thread_id !== threadToDelete);
         if (remainingThreads.length > 0) {
           setCurrentThreadId(remainingThreads[0].thread_id);
         } else {
           await handleNewThread();
         }
       }
-      // Note: Backend doesn't have delete endpoint yet, but UI will update
+      
+      // Refresh threads list
       await fetchThreads();
+      
+      // Close modal and reset state
+      setDeleteModalOpen(false);
+      setThreadToDelete(null);
+    } catch (error) {
+      console.error('Error deleting thread:', error);
+      alert('Failed to delete chat. Please try again.');
     }
+  };
+
+  const cancelDeleteThread = () => {
+    setDeleteModalOpen(false);
+    setThreadToDelete(null);
   };
 
   const handleSendMessage = async (message, tools = []) => {
@@ -177,6 +203,18 @@ function App() {
           }}
         />
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={cancelDeleteThread}
+        onConfirm={confirmDeleteThread}
+        title="Delete Chat"
+        message="Are you sure you want to delete this chat? This action cannot be undone and will permanently remove all messages and uploaded documents."
+        confirmText="Delete"
+        cancelText="Cancel"
+        danger={true}
+      />
     </div>
   );
 }
