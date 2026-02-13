@@ -198,10 +198,22 @@ async def upload_pdf(
 
 @chat_router.delete("/threads/{thread_id}")
 async def delete_thread(thread_id: str):
-    return {
-        "status": "not_implemented",
-        "message": "Thread deletion not yet implemented"
-    }
+    try:
+        success = ChatService.delete_thread(thread_id)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete thread")
+        
+        return {
+            "status": "success", 
+            "message": f"Thread {thread_id} deleted successfully",
+            "thread_id": thread_id
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete thread: {str(e)}")
 
 
 @chat_router.post("/query-document", response_model=DocumentQueryResponse)
