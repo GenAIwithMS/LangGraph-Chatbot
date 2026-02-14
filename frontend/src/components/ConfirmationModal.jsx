@@ -6,54 +6,40 @@ const ConfirmationModal = ({
   onClose, 
   onConfirm, 
   title = "Confirm Action",
-  message = "Are you sure you want to proceed?",
+  message = "Are you sure?",
   confirmText = "Confirm", 
   cancelText = "Cancel",
   danger = false
 }) => {
-  // Handle ESC key to close modal
   useEffect(() => {
-    const handleEsc = (event) => {
-      if (event.keyCode === 27) {
-        onClose();
-      }
-    };
+    const handleEsc = (e) => e.keyCode === 27 && onClose();
     
     if (isOpen) {
-      document.addEventListener('keydown', handleEsc, false);
-      // Prevent background scrolling when modal is open
+      document.addEventListener('keydown', handleEsc);
       document.body.style.overflow = 'hidden';
     }
     
     return () => {
-      document.removeEventListener('keydown', handleEsc, false);
+      document.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = 'visible';
     };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-      onClick={handleBackdropClick}
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-auto border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-sm w-full border border-gray-200 dark:border-gray-700 animate-scale-in">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2">
             {danger && (
-              <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
-              </div>
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
             )}
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
               {title}
             </h2>
           </div>
@@ -66,26 +52,26 @@ const ConfirmationModal = ({
         </div>
 
         {/* Content */}
-        <div className="p-6">
-          <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+        <div className="px-4 py-3">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             {message}
           </p>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 p-6 pt-0 justify-end">
+        <div className="flex gap-2 px-4 pb-4 justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+            className={`px-3 py-1.5 text-sm font-medium text-white rounded-md transition-all duration-200 ${
               danger
-                ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
             {confirmText}
