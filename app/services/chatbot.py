@@ -10,24 +10,16 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from app.tools import Search, Weather, Calculator, Stock_price
 from app.services.rag import has_document, retrieve_from_document
 from app.database import DatabaseConfig,MySQLCheckpointSaver,ThreadMetadata
-# from app.database.mysql_checkpoint import 
-# from app.database.models import 
 import os
 
 load_dotenv()
 
-# api = os.getenv("OPENAI_API_KEY")
 api = os.getenv("GROQ_API_KEY")
 
 model = ChatGroq(
     model="openai/gpt-oss-120b",
     api_key=api
     )
-# model = ChatOpenAI(
-#     model="openai/gpt-oss-120b",
-#     openai_api_key=api,
-#     base_url="https://api.canopywave.io/v1"
-#     )
 
 # Available tools for the chatbot
 all_tools = [Search, Weather, Calculator, Stock_price]

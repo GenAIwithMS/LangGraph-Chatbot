@@ -236,7 +236,6 @@ async def query_document(request: DocumentQueryRequest):
         context_text = "\n\n".join(retrieval_result["context"])
         
         api = os.getenv("GROQ_API_KEY")
-        # llm = ChatOpenAI(model="openai/gpt-oss-120b", openai_api_key=api, base_url="https://api.canopywave.io/v1")
         llm = ChatGroq(model="openai/gpt-oss-120b", openai_api_key=api)
         prompt = f"""Based on the following context from a document, answer the question.
 
