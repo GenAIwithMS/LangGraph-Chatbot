@@ -7,3 +7,5 @@ brave_api = os.getenv("BRAVE_API_KEY")
 
 Search = BraveSearch.from_api_key(api_key=brave_api)
 
+
+
