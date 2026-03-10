@@ -73,37 +73,77 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
         
         session = self.session_factory()
         try:
-            for idx, (channel, value) in enumerate(writes):
-                value_blob = pickle.dumps(value)
+            # Ensure checkpoint exists before adding writes (to satisfy foreign key constraint)
+            # LangGraph may call put_writes before put, so create a placeholder if needed
+            checkpoint_exists = session.query(CheckpointModel).filter_by(
+                thread_id=thread_id,
+                checkpoint_ns=checkpoint_ns,
+                checkpoint_id=checkpoint_id
+            ).first()
+            
+            if not checkpoint_exists:
+                # Create a placeholder checkpoint that will be updated by put() later
+                placeholder_checkpoint = {
+                    "id": checkpoint_id,
+                    "v": 1,
+                    "ts": "",
+                    "channel_values": {},
+                    "channel_versions": {},
+                    "versions_seen": {}
+                }
+                placeholder_checkpoint_blob = pickle.dumps(placeholder_checkpoint)
+                placeholder_metadata_blob = pickle.dumps({})
                 
-                # Check if write exists
-                existing = session.query(CheckpointWriteModel).filter_by(
+                new_checkpoint = CheckpointModel(
                     thread_id=thread_id,
                     checkpoint_ns=checkpoint_ns,
                     checkpoint_id=checkpoint_id,
-                    task_id=task_id,
-                    idx=idx
-                ).first()
-                
-                if existing:
-                    # Update existing write
-                    existing.type = type(value).__name__
-                    existing.value = value_blob
-                else:
-                    # Insert new write
-                    new_write = CheckpointWriteModel(
+                    parent_checkpoint_id=None,
+                    type=None,
+                    checkpoint=placeholder_checkpoint_blob,
+                    meta=placeholder_metadata_blob
+                )
+                session.add(new_checkpoint)
+                session.flush()  # Flush to make the checkpoint available for foreign key constraint
+                print(f"[DEBUG] Created placeholder checkpoint: {checkpoint_id}")
+            
+            # Use autoflush=False to prevent premature flush during queries
+            with session.no_autoflush:
+                for idx, (channel, value) in enumerate(writes):
+                    value_blob = pickle.dumps(value)
+                    
+                    # Check if write exists
+                    existing = session.query(CheckpointWriteModel).filter_by(
                         thread_id=thread_id,
                         checkpoint_ns=checkpoint_ns,
                         checkpoint_id=checkpoint_id,
                         task_id=task_id,
-                        idx=idx,
-                        channel=channel,
-                        type=type(value).__name__,
-                        value=value_blob
-                    )
-                    session.add(new_write)
+                        idx=idx
+                    ).first()
+                    
+                    if existing:
+                        # Update existing write
+                        existing.type = type(value).__name__
+                        existing.value = value_blob
+                    else:
+                        # Insert new write
+                        new_write = CheckpointWriteModel(
+                            thread_id=thread_id,
+                            checkpoint_ns=checkpoint_ns,
+                            checkpoint_id=checkpoint_id,
+                            task_id=task_id,
+                            idx=idx,
+                            channel=channel,
+                            type=type(value).__name__,
+                            value=value_blob
+                        )
+                        session.add(new_write)
             
             session.commit()
+        except Exception as e:
+            print(f"[ERROR] Failed to save checkpoint writes: {e}")
+            session.rollback()
+            raise
         finally:
             session.close()
     
