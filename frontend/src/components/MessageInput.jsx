@@ -2,13 +2,19 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, Paperclip, FileText, Loader2, Wrench, Search, FileEdit, X } from "lucide-react";
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from "./ui/prompt-input";
 
-const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, documentInfo, uploadingPDF }) => {
+const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, documentInfo, uploadingPDF, currentThreadId }) => {
   const [message, setMessage] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [selectedTools, setSelectedTools] = useState([]);
   const fileInputRef = useRef(null);
   const toolsMenuRef = useRef(null);
+
+  // Keep the input writable while the agent is generating, but block sending.
+  // `disabled` (= chatLoading || uploadingPDF || !currentThreadId) still
+  // prevents submitting; the textarea itself is only locked while a PDF is
+  // uploading or no thread exists yet.
+  const inputDisabled = uploadingPDF || !currentThreadId;
 
   // Close tools menu when clicking outside
   useEffect(() => {
@@ -91,7 +97,7 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
         value={message}
         onValueChange={setMessage}
         onSubmit={handleSubmit}
-        disabled={disabled}
+        disabled={inputDisabled}
         maxHeight={200}
         className={`max-w-3xl mx-auto ${isDragging ? "ring-2 ring-blue-500" : ""}`}
         onDrop={handleDrop}
@@ -115,7 +121,7 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
 
         <PromptInputTextarea
           placeholder={isDragging ? "Drop PDF file here..." : "Send a message..."}
-          disabled={disabled}
+          disabled={inputDisabled}
         />
 
         <PromptInputActions className="flex items-center justify-between gap-2 px-1 pb-1">

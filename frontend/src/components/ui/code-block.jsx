@@ -12,14 +12,14 @@ function escapeHtml(s) {
     .replace(/>/g, "&gt;")
 }
 
-export function CopyButton({ value, className }) {
+export function CopyButton({ value, className, inline }) {
   const [copied, setCopied] = useState(false)
 
   const onCopy = async () => {
     try {
       await navigator.clipboard.writeText(value)
       setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      setTimeout(() => setCopied(false), 2000)
     } catch (e) {
       // clipboard may be unavailable; ignore
     }
@@ -29,14 +29,20 @@ export function CopyButton({ value, className }) {
     <button
       type="button"
       onClick={onCopy}
-      aria-label="Copy code"
-      title="Copy code"
+      aria-label="Copy"
+      title="Copy"
       className={cn(
-        "absolute right-2 top-2 z-10 inline-flex items-center justify-center rounded-md border border-gray-600 bg-[#1a1b1e]/90 p-1.5 text-gray-300 opacity-0 transition-opacity hover:text-white group-hover:opacity-100 focus:opacity-100",
+        "inline-flex items-center justify-center gap-1 rounded-md p-1.5 text-gray-300 transition-colors hover:text-white",
+        inline
+          ? copied
+            ? "text-green-400"
+            : ""
+          : "absolute right-2 top-2 z-10 border border-gray-600 bg-[#1a1b1e]/90 opacity-0 group-hover:opacity-100 focus:opacity-100",
         className
       )}
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
+      {inline && copied && <span className="text-xs">Copied</span>}
     </button>
   )
 }

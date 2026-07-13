@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 
 function nodeToString(node) {
@@ -12,7 +12,67 @@ function nodeToString(node) {
   return '';
 }
 
-const MessageList = ({ messages, loading }) => {
+function MessageActions({ content, onRegenerate }) {
+  const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState(null); // 'like' | 'dislike'
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      // clipboard may be unavailable; ignore
+    }
+  };
+
+  const btn =
+    'inline-flex items-center justify-center p-1.5 rounded-md text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200';
+
+  return (
+    <div className="mt-2 flex items-center gap-1 justify-end">
+      <button
+        type="button"
+        onClick={handleCopy}
+        title="Copy"
+        aria-label="Copy"
+        className={`${btn} ${copied ? 'text-green-400' : ''}`}
+      >
+        {copied ? <Check size={15} /> : <Copy size={15} />}
+        {copied && <span className="text-xs ml-1">Copied</span>}
+      </button>
+      <button
+        type="button"
+        title="Helpful"
+        aria-label="Helpful"
+        onClick={() => setFeedback(feedback === 'like' ? null : 'like')}
+        className={`${btn} ${feedback === 'like' ? 'text-green-400' : ''}`}
+      >
+        <ThumbsUp size={15} />
+      </button>
+      <button
+        type="button"
+        title="Not helpful"
+        aria-label="Not helpful"
+        onClick={() => setFeedback(feedback === 'dislike' ? null : 'dislike')}
+        className={`${btn} ${feedback === 'dislike' ? 'text-red-400' : ''}`}
+      >
+        <ThumbsDown size={15} />
+      </button>
+      <button
+        type="button"
+        title="Regenerate"
+        aria-label="Regenerate"
+        onClick={onRegenerate}
+        className={btn}
+      >
+        <RotateCcw size={15} />
+      </button>
+    </div>
+  );
+}
+
+const MessageList = ({ messages, loading, onRegenerate }) => {
   const messagesEndRef = useRef(null);
   const previousLengthRef = useRef(0);
 
@@ -149,6 +209,9 @@ const MessageList = ({ messages, loading }) => {
                 {message.content}
               </ReactMarkdown>
             </div>
+            {!isUser && (
+              <MessageActions content={message.content} onRegenerate={onRegenerate} />
+            )}
           </div>
         </div>
       </div>

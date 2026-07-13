@@ -184,11 +184,51 @@ export const useChat = (threadId) => {
     }
   };
 
+  const regenerate = async (tools = []) => {
+    if (!threadId) return;
+
+    const lastHuman = [...messages].reverse().find(m => m.type === 'human');
+    if (!lastHuman) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Drop the trailing AI message so it gets replaced
+      setMessages(prev =>
+        prev.length && prev[prev.length - 1].type === 'ai'
+          ? prev.slice(0, -1)
+          : prev
+      );
+
+      const response = await chatService.sendMessage(
+        threadId,
+        lastHuman.content,
+        tools
+      );
+
+      setMessages(prev => [
+        ...prev,
+        {
+          type: 'ai',
+          content: response.response,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error regenerating:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     messages,
     loading,
     error,
     sendMessage,
+    regenerate,
     loadMessages,
     streamingProgress,
   };

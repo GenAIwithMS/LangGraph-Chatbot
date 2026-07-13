@@ -30,6 +30,7 @@ function App() {
     loading: chatLoading,
     error: chatError,
     sendMessage,
+    regenerate,
     loadMessages,
     streamingProgress,
   } = useChat(currentThreadId);
@@ -175,13 +176,18 @@ function App() {
           </div>
 
           {/* Messages */}
-          <MessageList messages={messages} loading={chatLoading} />
+          <MessageList
+            messages={messages}
+            loading={chatLoading}
+            onRegenerate={regenerate}
+          />
 
           {/* Input */}
           <MessageInput
             onSendMessage={handleSendMessage}
             onUploadPDF={handleUploadPDF}
             disabled={chatLoading || uploadingPDF || !currentThreadId}
+            currentThreadId={currentThreadId}
             hasDocument={documentInfo?.has_document}
             documentInfo={documentInfo}
             uploadingPDF={uploadingPDF}
