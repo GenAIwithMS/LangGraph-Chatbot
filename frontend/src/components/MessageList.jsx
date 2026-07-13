@@ -3,6 +3,14 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { Loader2 } from 'lucide-react';
+import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
+
+function nodeToString(node) {
+  if (typeof node === 'string') return node;
+  if (Array.isArray(node)) return node.map(nodeToString).join('');
+  if (node && node.props && node.props.children) return nodeToString(node.props.children);
+  return '';
+}
 
 const MessageList = ({ messages, loading }) => {
   const messagesEndRef = useRef(null);
@@ -47,20 +55,32 @@ const MessageList = ({ messages, loading }) => {
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeRaw]}
                 components={{
-                  code: ({ node, inline, className, children, ...props }) => {
-                    return inline ? (
-                      <code
-                        className="bg-[#1a1b1e] px-1.5 py-0.5 rounded text-sm font-mono text-gray-200"
-                        {...props}
-                      >
-                        {children}
-                      </code>
-                    ) : (
-                      <pre className="bg-[#1a1b1e] p-4 rounded-lg overflow-x-auto my-3 border border-gray-700">
-                        <code className={`${className} text-gray-200 text-sm font-mono`} {...props}>
+                  pre: ({ children }) => <>{children}</>,
+                  code: ({ node, className, children, ...props }) => {
+                    const match = /language-(\w+)/.exec(className || '');
+                    const text = nodeToString(children).replace(/\n$/, '');
+                    const isBlock = !!match || text.includes('\n');
+
+                    if (!isBlock) {
+                      return (
+                        <code
+                          className="bg-[#1a1b1e] px-1.5 py-0.5 rounded text-sm font-mono text-gray-200"
+                          {...props}
+                        >
                           {children}
                         </code>
-                      </pre>
+                      );
+                    }
+
+                    const lang = match ? match[1] : 'text';
+                    return (
+                      <CodeBlock>
+                        <CodeBlockGroup>
+                          <span className="text-xs text-gray-400">{lang}</span>
+                        </CodeBlockGroup>
+                        <CopyButton value={text} />
+                        <CodeBlockCode code={text} language={lang} theme="github-dark" />
+                      </CodeBlock>
                     );
                   },
                   p: ({ children }) => (
