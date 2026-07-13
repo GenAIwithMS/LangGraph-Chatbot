@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, RemoveMessage
 from app.services.chatbot import (
     chatbot,
     retrieve_all_threads,
@@ -171,7 +171,104 @@ class ChatService:
         except Exception as e:
             print(f"Error sending message: {e}")
             raise Exception(f"Failed to send message: {str(e)}")
-    
+
+    @staticmethod
+    def regenerate_message(thread_id: str, tools: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Regenerate the last AI response without appending a new human message.
+
+        This re-runs the agent from the current thread state so the prior user
+        prompt is reused as context instead of being sent again.
+        """
+        config = {
+            "configurable": {"thread_id": thread_id},
+            "metadata": {"thread_id": thread_id},
+        }
+
+        try:
+            # Blogs tool uses a separate, stateless graph keyed by topic
+            if tools and "blogs" in tools:
+                try:
+                    from app.tools.blogs.graph import app as blog_app
+
+                    blog_state_obj = blog_app.get_state(config)
+                    topic = (
+                        blog_state_obj.values.get("topic")
+                        if blog_state_obj and blog_state_obj.values
+                        else None
+                    )
+                    if not topic:
+                        raise Exception("No blog topic found to regenerate")
+
+                    final_state = blog_app.invoke(
+                        {"topic": topic, "as_of": date.today().isoformat()}
+                    )
+                    touch_thread(thread_id)
+                    return {
+                        "response": final_state.get("final", "Blog generated successfully"),
+                        "thread_id": thread_id,
+                        "tool_used": "blogs",
+                    }
+                except Exception as blog_error:
+                    return {
+                        "response": f"⚠️ **Blog Generation Failed**\n\n{str(blog_error)}",
+                        "thread_id": thread_id,
+                        "tool_used": "blogs",
+                    }
+
+            # Chatbot path: drop the trailing assistant turn, then re-run
+            current = chatbot.get_state(config)
+            messages = list(current.values["messages"]) if current and current.values else []
+
+            last_ai_idx = None
+            for i in reversed(range(len(messages))):
+                if isinstance(messages[i], AIMessage):
+                    last_ai_idx = i
+                    break
+
+            if last_ai_idx is None:
+                raise Exception("No AI response found to regenerate")
+
+            # Remove the assistant turn (and any tool results that follow it)
+            removals = [
+                RemoveMessage(id=m.id)
+                for m in messages[last_ai_idx:]
+                if getattr(m, "id", None)
+            ]
+            if removals:
+                chatbot.update_state(current.config, {"messages": removals})
+
+            doc_exists = has_document(thread_id)
+
+            final_state = chatbot.invoke(
+                {
+                    "messages": [],
+                    "has_document": doc_exists,
+                    "thread_id": thread_id,
+                },
+                config=config,
+            )
+
+            out_messages = final_state["messages"]
+            touch_thread(thread_id)
+
+            ai_response = None
+            has_tool_calls = False
+            for msg in reversed(out_messages):
+                if isinstance(msg, ToolMessage):
+                    has_tool_calls = True
+                if isinstance(msg, AIMessage) and not ai_response:
+                    ai_response = msg.content
+                    break
+
+            return {
+                "response": ai_response or "No response generated",
+                "thread_id": thread_id,
+                "has_tool_calls": has_tool_calls,
+            }
+        except Exception as e:
+            print(f"Error regenerating message: {e}")
+            raise Exception(f"Failed to regenerate message: {str(e)}")
+
     @staticmethod
     def stream_message(message: str, thread_id: str, tools: Optional[List[str]] = None):
         config = {
@@ -250,24 +347,55 @@ class ChatService:
             
             # Check if thread has a document
             doc_exists = has_document(thread_id)
-            
+
+            # Emit an initial live-thinking signal
+            yield {"content": "Thinking...", "message_type": "thinking"}
+
+            seen_tool_calls = set()
+
             for message_chunk, metadata in chatbot.stream(
                 {
                     "messages": [HumanMessage(content=message)],
                     "has_document": doc_exists,
-                    "thread_id": thread_id
+                    "thread_id": thread_id,
                 },
                 config=config,
                 stream_mode="messages",
             ):
-                # Only yield AI messages with content (skip tool messages and empty AI messages)
-                if isinstance(message_chunk, AIMessage) and message_chunk.content:
+                # Tool produced a result -> live "finished" signal
+                if isinstance(message_chunk, ToolMessage):
+                    name = getattr(message_chunk, "name", None) or "tool"
                     yield {
-                        "content": message_chunk.content,
-                        "message_type": "ai",
-                        "tool_name": None
+                        "content": f"Finished using {name}.",
+                        "message_type": "thinking",
                     }
-                # Skip ToolMessage and HumanMessage in stream (already displayed by frontend)
+                    continue
+
+                if isinstance(message_chunk, AIMessage):
+                    # The assistant is invoking a tool -> live "using" signal
+                    for tc in getattr(message_chunk, "tool_calls", None) or []:
+                        tc_id = tc.get("id")
+                        name = tc.get("name", "tool")
+                        if tc_id and tc_id not in seen_tool_calls:
+                            seen_tool_calls.add(tc_id)
+                            yield {
+                                "content": f"Using {name}...",
+                                "message_type": "thinking",
+                            }
+
+                    content = message_chunk.content
+                    if not content:
+                        continue
+                    if isinstance(content, list):
+                        text = "".join(
+                            c if isinstance(c, str)
+                            else (c.get("text", "") if isinstance(c, dict) else "")
+                            for c in content
+                        )
+                    else:
+                        text = str(content)
+                    if text:
+                        yield {"content": text, "message_type": "ai"}
         except Exception as e:
             print(f"Error streaming message: {e}")
             raise Exception(f"Failed to stream message: {str(e)}")

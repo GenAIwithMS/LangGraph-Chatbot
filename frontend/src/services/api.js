@@ -20,6 +20,15 @@ export const chatService = {
     return response.data;
   },
 
+  // Regenerate the last AI response for a thread (no new user message sent)
+  regenerateMessage: async (threadId, tools = []) => {
+    const response = await api.post('/chat/regenerate', {
+      thread_id: threadId,
+      tools: tools,
+    });
+    return response.data;
+  },
+
   // Stream messages (using EventSource for SSE)
   streamMessage: (threadId, message, tools = [], onMessage, onError) => {
     const toolsParam = tools.length > 0 ? `&tools=${tools.join(',')}` : '';

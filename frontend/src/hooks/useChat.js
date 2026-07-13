@@ -57,7 +57,14 @@ export const useChat = (threadId) => {
 
     try {
       setLoading(true);
-      
+      setError(null);
+
+      const handleError = (error) => {
+        setError('Streaming error occurred');
+        setStreamingProgress(null);
+        setLoading(false);
+      };
+
       // Add user message immediately
       const userMessage = {
         type: 'human',
@@ -67,7 +74,7 @@ export const useChat = (threadId) => {
       };
       setMessages(prev => [...prev, userMessage]);
 
-      // Initialize streaming progress if using blogs tool
+      // Blogs tool: keep the fixed-step progress UI
       if (tools.includes('blogs')) {
         setStreamingProgress({
           isStreaming: true,
@@ -80,13 +87,11 @@ export const useChat = (threadId) => {
             { label: 'Finalizing...', status: 'pending' },
           ],
         });
-        
-        // Use streaming endpoint
+
         let aiResponse = '';
-        
+
         const handleMessage = (data) => {
           if (data.message_type === 'progress') {
-            // Update progress based on node
             if (data.node === 'router') {
               updateProgressStep('Routing...', 'completed');
               updateProgressStep('Researching...', 'in-progress');
@@ -118,7 +123,6 @@ export const useChat = (threadId) => {
                 return { ...prev, steps: newSteps };
               });
             } else if (data.node === 'worker') {
-              // Keep writing in progress, just add count
               setStreamingProgress(prev => {
                 if (!prev) return null;
                 const newSteps = [...prev.steps];
@@ -135,9 +139,8 @@ export const useChat = (threadId) => {
             updateProgressStep('Writing sections...', 'completed');
             updateProgressStep('Finalizing...', 'completed');
           }
-          
+
           if (data.done) {
-            // Add final AI message
             setMessages(prev => [...prev, {
               type: 'ai',
               content: aiResponse,
@@ -147,40 +150,120 @@ export const useChat = (threadId) => {
             setLoading(false);
           }
         };
-        
-        const handleError = (error) => {
-          setError('Streaming error occurred');
-          setStreamingProgress(null);
-          setLoading(false);
-        };
-        
+
         chatService.streamMessage(threadId, message, tools, handleMessage, handleError);
         return;
       }
 
-      // Non-streaming path for other tools
-      const response = await chatService.sendMessage(threadId, message, tools);
-      
-      // Replace with actual response
+      // Chatbot path: live thinking bar + token streaming into a placeholder message
+      setStreamingProgress({
+        isStreaming: true,
+        toolName: 'chat',
+        current: 'Thinking...',
+        thoughts: [],
+      });
+
       setMessages(prev => [
-        ...prev.slice(0, -1),
-        userMessage,
+        ...prev,
         {
           type: 'ai',
-          content: response.response,
+          content: '',
           timestamp: new Date().toISOString(),
-        }
+          streaming: true,
+        },
       ]);
-      
-      setError(null);
+
+      const handleMessage = (data) => {
+        if (data.error) {
+          setError(data.error);
+          setMessages(prev => prev.filter(m => !m.streaming));
+          setStreamingProgress(null);
+          setLoading(false);
+          return;
+        }
+
+        if (data.message_type === 'thinking') {
+          setStreamingProgress(prev =>
+            prev
+              ? { ...prev, current: data.content, thoughts: [...(prev.thoughts || []), data.content] }
+              : prev
+          );
+        } else if (data.message_type === 'ai') {
+          setStreamingProgress(prev =>
+            prev ? { ...prev, current: 'Generating response...' } : prev
+          );
+          setMessages(prev => {
+            const copy = [...prev];
+            const idx = copy.findIndex(m => m.streaming);
+            if (idx !== -1) {
+              copy[idx] = { ...copy[idx], content: copy[idx].content + data.content };
+            }
+            return copy;
+          });
+        }
+
+        if (data.done) {
+          setMessages(prev =>
+            prev.map(m => (m.streaming ? { ...m, streaming: false } : m))
+          );
+          setStreamingProgress(null);
+          setLoading(false);
+        }
+      };
+
+      chatService.streamMessage(threadId, message, tools, handleMessage, handleError);
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);
       setStreamingProgress(null);
+      setLoading(false);
+    }
+  };
+
+  const regenerate = async () => {
+    if (!threadId) return;
+
+    const lastHuman = [...messages].reverse().find(m => m.type === 'human');
+    if (!lastHuman) return;
+
+    const tools = lastHuman.tools && lastHuman.tools.length > 0 ? lastHuman.tools : [];
+
+    try {
+      setLoading(true);
+      setError(null);
+      setStreamingProgress({
+        isStreaming: true,
+        toolName: 'chat',
+        current: 'Regenerating response...',
+        thoughts: [],
+      });
+
+      // Drop the trailing AI message and add a placeholder that fills live
+      setMessages(prev => {
+        const copy = [...prev];
+        if (copy.length && copy[copy.length - 1].type === 'ai') copy.pop();
+        copy.push({
+          type: 'ai',
+          content: '',
+          timestamp: new Date().toISOString(),
+          streaming: true,
+        });
+        return copy;
+      });
+
+      const response = await chatService.regenerateMessage(threadId, tools);
+
+      setMessages(prev =>
+        prev.map(m =>
+          m.streaming ? { ...m, content: response.response, streaming: false } : m
+        )
+      );
+    } catch (err) {
+      setError(err.message);
+      console.error('Error regenerating:', err);
     } finally {
-      if (!tools.includes('blogs')) {
-        setLoading(false);
-      }
+      setLoading(false);
+      setStreamingProgress(null);
     }
   };
 
@@ -189,6 +272,7 @@ export const useChat = (threadId) => {
     loading,
     error,
     sendMessage,
+    regenerate,
     loadMessages,
     streamingProgress,
   };

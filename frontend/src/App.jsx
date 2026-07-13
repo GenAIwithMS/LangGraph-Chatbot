@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
-import ProgressSidebar from './components/ProgressSidebar';
 import ConfirmationModal from './components/ConfirmationModal';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
@@ -30,6 +29,7 @@ function App() {
     loading: chatLoading,
     error: chatError,
     sendMessage,
+    regenerate,
     loadMessages,
     streamingProgress,
   } = useChat(currentThreadId);
@@ -175,13 +175,20 @@ function App() {
           </div>
 
           {/* Messages */}
-          <MessageList messages={messages} loading={chatLoading} />
+          <MessageList
+            messages={messages}
+            loading={chatLoading}
+            streaming={streamingProgress?.isStreaming}
+            streamingProgress={streamingProgress}
+            onRegenerate={regenerate}
+          />
 
           {/* Input */}
           <MessageInput
             onSendMessage={handleSendMessage}
             onUploadPDF={handleUploadPDF}
             disabled={chatLoading || uploadingPDF || !currentThreadId}
+            currentThreadId={currentThreadId}
             hasDocument={documentInfo?.has_document}
             documentInfo={documentInfo}
             uploadingPDF={uploadingPDF}
@@ -194,14 +201,6 @@ function App() {
             </div>
           )}
         </div>
-
-        {/* Progress Sidebar */}
-        <ProgressSidebar 
-          streamingProgress={streamingProgress}
-          onClose={() => {
-            // Optional: allow closing the sidebar while still processing
-          }}
-        />
       </div>
 
       {/* Delete Confirmation Modal */}

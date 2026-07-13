@@ -78,8 +78,8 @@ If the user's question is related to the document, base your answer on this cont
         print(f"[DEBUG] Skipping document retrieval - thread_id: {thread_id}, has_doc: {has_doc}")
     
     model_with_tools = model.bind_tools(all_tools)
-    response = model_with_tools.invoke(messages)
-    return {"messages": [response]}
+    for chunk in model_with_tools.stream(messages):
+        yield {"messages": [chunk]}
 
 
 # Create tool node

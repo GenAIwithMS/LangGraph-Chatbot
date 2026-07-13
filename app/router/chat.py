@@ -5,6 +5,7 @@ import json
 import os
 from app.schema.models import (
     ChatRequest,
+    RegenerateRequest,
     ChatResponse,
     ThreadListResponse,
     ThreadHistoryResponse,
@@ -43,6 +44,15 @@ async def chat(request: ChatRequest):
         
         return ChatResponse(**result)
     
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@chat_router.post("/chat/regenerate", response_model=ChatResponse)
+async def regenerate(request: RegenerateRequest):
+    try:
+        result = ChatService.regenerate_message(request.thread_id, request.tools)
+        return ChatResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
