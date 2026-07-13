@@ -63,7 +63,7 @@ function MessageActions({ content, onRegenerate }) {
         type="button"
         title="Regenerate"
         aria-label="Regenerate"
-        onClick={onRegenerate}
+        onClick={() => onRegenerate()}
         className={btn}
       >
         <RotateCcw size={15} />
@@ -72,7 +72,99 @@ function MessageActions({ content, onRegenerate }) {
   );
 }
 
-const MessageList = ({ messages, loading, onRegenerate }) => {
+const markdownComponents = {
+  pre: ({ children }) => <>{children}</>,
+  code: ({ node, className, children, ...props }) => {
+    const match = /language-(\w+)/.exec(className || '');
+    const text = nodeToString(children).replace(/\n$/, '');
+    const isBlock = !!match || text.includes('\n');
+
+    if (!isBlock) {
+      return (
+        <code
+          className="bg-[#1a1b1e] px-1.5 py-0.5 rounded text-sm font-mono text-gray-200"
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    }
+
+    const lang = match ? match[1] : 'text';
+    return (
+      <CodeBlock>
+        <CodeBlockGroup>
+          <span className="text-xs text-gray-400">{lang}</span>
+        </CodeBlockGroup>
+        <CopyButton value={text} />
+        <CodeBlockCode code={text} language={lang} theme="github-dark" />
+      </CodeBlock>
+    );
+  },
+  p: ({ children }) => (
+    <p className="mb-3 last:mb-0 leading-7 text-gray-100 whitespace-pre-wrap break-words">{children}</p>
+  ),
+  ul: ({ children }) => (
+    <ul className="list-disc ml-6 mb-3 space-y-1 text-gray-100">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="list-decimal ml-6 mb-3 space-y-1 text-gray-100">
+      {children}
+    </ol>
+  ),
+  li: ({ children }) => (
+    <li className="leading-7 text-gray-100">{children}</li>
+  ),
+  h1: ({ children }) => (
+    <h1 className="text-2xl font-bold mb-3 mt-4 text-gray-100">{children}</h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="text-xl font-bold mb-3 mt-4 text-gray-100">{children}</h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="text-lg font-bold mb-2 mt-3 text-gray-100">{children}</h3>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-4 border-gray-600 pl-4 my-3 italic text-gray-300">
+      {children}
+    </blockquote>
+  ),
+  table: ({ children }) => (
+    <div className="overflow-x-auto my-3">
+      <table className="min-w-full border-collapse border border-gray-600">
+        {children}
+      </table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="border border-gray-600 px-4 py-2 bg-[#2a2b32] font-semibold text-left text-gray-100">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="border border-gray-600 px-4 py-2 text-gray-100">
+      {children}
+    </td>
+  ),
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-400 hover:text-blue-300 underline break-words"
+    >
+      {children}
+    </a>
+  ),
+  strong: ({ children }) => (
+    <strong className="font-semibold text-gray-100">{children}</strong>
+  ),
+  br: () => <br />,
+};
+
+const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate }) => {
   const messagesEndRef = useRef(null);
   const previousLengthRef = useRef(0);
 
@@ -111,103 +203,66 @@ const MessageList = ({ messages, loading, onRegenerate }) => {
             }
           `}>
             <div className="prose prose-invert max-w-none">
+              {message.streaming && streamingProgress?.isStreaming && (
+                <div className="mb-3 rounded-md border border-gray-700 bg-[#1a1b1e]/60 p-3">
+                  <div className="flex items-center gap-2 text-sm text-gray-300">
+                    <Loader2 size={15} className="animate-spin text-blue-400 shrink-0" />
+                    <span className="font-medium">
+                      {streamingProgress.current || 'Thinking...'}
+                    </span>
+                  </div>
+
+                  {streamingProgress.thoughts?.length > 0 && (
+                    <div className="mt-1.5 space-y-0.5 text-xs text-gray-500">
+                      {streamingProgress.thoughts.map((t, i) => (
+                        <div key={i} className="truncate">• {t}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {streamingProgress.steps?.length > 0 && (
+                    <div className="mt-1.5 space-y-1">
+                      {streamingProgress.steps.map((s, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span
+                            className={
+                              s.status === 'completed'
+                                ? 'text-green-400'
+                                : s.status === 'in-progress'
+                                ? 'text-gray-200'
+                                : 'text-gray-600'
+                            }
+                          >
+                            •
+                          </span>
+                          <span
+                            className={
+                              s.status === 'in-progress'
+                                ? 'text-gray-200'
+                                : s.status === 'completed'
+                                ? 'text-gray-400'
+                                : 'text-gray-600'
+                            }
+                          >
+                            {s.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeRaw]}
-                components={{
-                  pre: ({ children }) => <>{children}</>,
-                  code: ({ node, className, children, ...props }) => {
-                    const match = /language-(\w+)/.exec(className || '');
-                    const text = nodeToString(children).replace(/\n$/, '');
-                    const isBlock = !!match || text.includes('\n');
-
-                    if (!isBlock) {
-                      return (
-                        <code
-                          className="bg-[#1a1b1e] px-1.5 py-0.5 rounded text-sm font-mono text-gray-200"
-                          {...props}
-                        >
-                          {children}
-                        </code>
-                      );
-                    }
-
-                    const lang = match ? match[1] : 'text';
-                    return (
-                      <CodeBlock>
-                        <CodeBlockGroup>
-                          <span className="text-xs text-gray-400">{lang}</span>
-                        </CodeBlockGroup>
-                        <CopyButton value={text} />
-                        <CodeBlockCode code={text} language={lang} theme="github-dark" />
-                      </CodeBlock>
-                    );
-                  },
-                  p: ({ children }) => (
-                    <p className="mb-3 last:mb-0 leading-7 text-gray-100 whitespace-pre-wrap break-words">{children}</p>
-                  ),
-                  ul: ({ children }) => (
-                    <ul className="list-disc ml-6 mb-3 space-y-1 text-gray-100">
-                      {children}
-                    </ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol className="list-decimal ml-6 mb-3 space-y-1 text-gray-100">
-                      {children}
-                    </ol>
-                  ),
-                  li: ({ children }) => (
-                    <li className="leading-7 text-gray-100">{children}</li>
-                  ),
-                  h1: ({ children }) => (
-                    <h1 className="text-2xl font-bold mb-3 mt-4 text-gray-100">{children}</h1>
-                  ),
-                  h2: ({ children }) => (
-                    <h2 className="text-xl font-bold mb-3 mt-4 text-gray-100">{children}</h2>
-                  ),
-                  h3: ({ children }) => (
-                    <h3 className="text-lg font-bold mb-2 mt-3 text-gray-100">{children}</h3>
-                  ),
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-gray-600 pl-4 my-3 italic text-gray-300">
-                      {children}
-                    </blockquote>
-                  ),
-                  table: ({ children }) => (
-                    <div className="overflow-x-auto my-3">
-                      <table className="min-w-full border-collapse border border-gray-600">
-                        {children}
-                      </table>
-                    </div>
-                  ),
-                  th: ({ children }) => (
-                    <th className="border border-gray-600 px-4 py-2 bg-[#2a2b32] font-semibold text-left text-gray-100">
-                      {children}
-                    </th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="border border-gray-600 px-4 py-2 text-gray-100">
-                      {children}
-                    </td>
-                  ),
-                  a: ({ href, children }) => (
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 underline break-words"
-                    >
-                      {children}
-                    </a>
-                  ),
-                  strong: ({ children }) => (
-                    <strong className="font-semibold text-gray-100">{children}</strong>
-                  ),
-                  br: () => <br />,
-                }}
+                components={markdownComponents}
               >
                 {message.content}
               </ReactMarkdown>
+              {message.streaming && (
+                <span className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-gray-400 animate-pulse" />
+              )}
             </div>
             {!isUser && (
               <MessageActions content={message.content} onRegenerate={onRegenerate} />
@@ -230,7 +285,7 @@ const MessageList = ({ messages, loading, onRegenerate }) => {
 
       {messages.map((message, index) => renderMessage(message, index))}
 
-      {loading && (
+      {loading && !streaming && (
         <div className="py-4 px-4">
           <div className="max-w-3xl mx-auto flex justify-start">
             <div className="flex items-center gap-2">

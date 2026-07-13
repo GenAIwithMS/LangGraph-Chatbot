@@ -10,6 +10,13 @@ class ChatRequest(BaseModel):
     tools: Optional[List[str]] = Field(None, description="List of tools to use (e.g., ['search', 'blogs'])")
 
 
+class RegenerateRequest(BaseModel):
+    """Request model for regenerating the last AI response"""
+
+    thread_id: str = Field(..., description="Thread ID for the conversation")
+    tools: Optional[List[str]] = Field(None, description="List of tools used (e.g., ['blogs'])")
+
+
 class ChatResponse(BaseModel):
     """Response model for chat messages"""
 
