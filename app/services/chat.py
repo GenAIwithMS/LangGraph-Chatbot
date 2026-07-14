@@ -438,20 +438,17 @@ class ChatService:
 
             target_idx = human_indices[human_index]
 
-            # Drop the edited human message and everything after it
-            removals = [
+            # Both the removals and the re-inserted (edited) human message must be
+            # applied in a SINGLE update_state. Using two separate calls with the
+            # same checkpoint config causes the second to overwrite the first,
+            # dropping the removals and merely appending a duplicate human turn.
+            edit_ops = [
                 RemoveMessage(id=m.id)
                 for m in messages[target_idx:]
                 if getattr(m, "id", None)
             ]
-            if removals:
-                chatbot.update_state(current.config, {"messages": removals})
-
-            # Re-insert the edited human message at the same position
-            chatbot.update_state(
-                current.config,
-                {"messages": [HumanMessage(content=new_content)]},
-            )
+            edit_ops.append(HumanMessage(content=new_content))
+            chatbot.update_state(current.config, {"messages": edit_ops})
 
             # Blogs tool uses a separate, stateless graph keyed by topic
             if tools and "blogs" in tools:

@@ -43,6 +43,11 @@ export const chatService = {
       }
       try {
         const data = JSON.parse(event.data);
+        // Close on terminal events so the browser doesn't surface a false
+        // "connection closed" error when the backend ends the stream.
+        if (data.done || data.error) {
+          eventSource.close();
+        }
         onMessage(data);
       } catch (error) {
         console.error('Error parsing message:', error);
@@ -50,9 +55,13 @@ export const chatService = {
     };
 
     eventSource.onerror = (error) => {
-      console.error('EventSource error:', error);
-      eventSource.close();
-      if (onError) onError(error);
+      // EventSource fires "error" on a normal connection close too. Only surface
+      // it as a real error if the connection is still open/connecting.
+      if (eventSource.readyState !== EventSource.CLOSED) {
+        console.error('EventSource error:', error);
+        eventSource.close();
+        if (onError) onError(error);
+      }
     };
 
     return eventSource;
