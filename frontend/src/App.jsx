@@ -30,6 +30,7 @@ function App() {
     error: chatError,
     sendMessage,
     regenerate,
+    editMessage,
     loadMessages,
     streamingProgress,
   } = useChat(currentThreadId);
@@ -181,6 +182,7 @@ function App() {
             streaming={streamingProgress?.isStreaming}
             streamingProgress={streamingProgress}
             onRegenerate={regenerate}
+            onEditMessage={editMessage}
           />
 
           {/* Input */}

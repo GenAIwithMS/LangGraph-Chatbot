@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
+import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil } from 'lucide-react';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 
 function nodeToString(node) {
@@ -10,6 +10,47 @@ function nodeToString(node) {
   if (Array.isArray(node)) return node.map(nodeToString).join('');
   if (node && node.props && node.props.children) return nodeToString(node.props.children);
   return '';
+}
+
+const btnClass =
+  'inline-flex items-center justify-center p-1.5 rounded-md text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200';
+
+function UserActions({ content, onEdit }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      // clipboard may be unavailable; ignore
+    }
+  };
+
+  return (
+    <div className="mt-2 flex items-center gap-1 justify-end">
+      <button
+        type="button"
+        onClick={handleCopy}
+        title="Copy"
+        aria-label="Copy"
+        className={`${btnClass} ${copied ? 'text-green-400' : ''}`}
+      >
+        {copied ? <Check size={15} /> : <Copy size={15} />}
+        {copied && <span className="text-xs ml-1">Copied</span>}
+      </button>
+      <button
+        type="button"
+        onClick={onEdit}
+        title="Edit"
+        aria-label="Edit"
+        className={btnClass}
+      >
+        <Pencil size={15} />
+      </button>
+    </div>
+  );
 }
 
 function MessageActions({ content, onRegenerate }) {
@@ -26,8 +67,7 @@ function MessageActions({ content, onRegenerate }) {
     }
   };
 
-  const btn =
-    'inline-flex items-center justify-center p-1.5 rounded-md text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200';
+  const btn = btnClass;
 
   return (
     <div className="mt-2 flex items-center gap-1 justify-end">
@@ -164,9 +204,11 @@ const markdownComponents = {
   br: () => <br />,
 };
 
-const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate }) => {
+const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage }) => {
   const messagesEndRef = useRef(null);
   const previousLengthRef = useRef(0);
+  const [editIndex, setEditIndex] = useState(null);
+  const [editValue, setEditValue] = useState('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -187,86 +229,158 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
 
   const renderMessage = (message, index) => {
     const isUser = message.type === 'human';
-    
-    return (
-      <div
-        key={index}
-        className="py-4 px-4"
-      >
-        <div className={`max-w-3xl mx-auto flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-          {/* Message Content */}
-          <div className={`
-            max-w-[80%] px-4 py-3 rounded-lg
-            ${isUser 
-              ? 'bg-[#2a2b32] text-gray-100' 
-              : 'text-gray-100'
-            }
-          `}>
-            <div className="prose prose-invert max-w-none">
-              {message.streaming && streamingProgress?.isStreaming && (
-                <div className="mb-3 rounded-md border border-gray-700 bg-[#1a1b1e]/60 p-3">
-                  <div className="flex items-center gap-2 text-sm text-gray-300">
-                    <Loader2 size={15} className="animate-spin text-blue-400 shrink-0" />
-                    <span className="font-medium">
-                      {streamingProgress.current || 'Thinking...'}
+
+    const commitEdit = () => {
+      if (editIndex === null) return;
+      const original = messages[editIndex]?.content;
+      const value = editValue;
+      setEditIndex(null);
+      setEditValue('');
+      if (value.trim() && value !== original) {
+        onEditMessage(value, editIndex);
+      }
+    };
+
+    // Edit mode for user messages
+    if (isUser && editIndex === index) {
+      return (
+        <div key={index} className="py-4 px-4">
+          <div className="max-w-3xl mx-auto flex justify-end">
+            <div className="w-full max-w-[80%]">
+              <textarea
+                className="w-full resize-none rounded-lg border border-gray-600 bg-[#1a1b1e] p-3 text-sm text-gray-100 outline-none focus:border-gray-400"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                rows={Math.min(12, editValue.split('\n').length + 1)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    commitEdit();
+                  } else if (e.key === 'Escape') {
+                    setEditIndex(null);
+                    setEditValue('');
+                  }
+                }}
+              />
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditIndex(null);
+                    setEditValue('');
+                  }}
+                  className="px-3 py-1 text-xs rounded-md text-gray-300 hover:bg-white/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={commitEdit}
+                  className="px-3 py-1 text-xs rounded-md bg-blue-600 text-white hover:bg-blue-500"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const bubbleInner = (
+      <div className="prose prose-invert max-w-none">
+        {message.streaming && streamingProgress?.isStreaming && (
+          <div className="mb-3 rounded-md border border-gray-700 bg-[#1a1b1e]/60 p-3">
+            <div className="flex items-center gap-2 text-sm text-gray-300">
+              <Loader2 size={15} className="animate-spin text-blue-400 shrink-0" />
+              <span className="font-medium">
+                {streamingProgress.current || 'Thinking...'}
+              </span>
+            </div>
+
+            {streamingProgress.thoughts?.length > 0 && (
+              <div className="mt-1.5 space-y-0.5 text-xs text-gray-500">
+                {streamingProgress.thoughts.map((t, i) => (
+                  <div key={i} className="truncate">• {t}</div>
+                ))}
+              </div>
+            )}
+
+            {streamingProgress.steps?.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                {streamingProgress.steps.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span
+                      className={
+                        s.status === 'completed'
+                          ? 'text-green-400'
+                          : s.status === 'in-progress'
+                          ? 'text-gray-200'
+                          : 'text-gray-600'
+                      }
+                    >
+                      •
+                    </span>
+                    <span
+                      className={
+                        s.status === 'in-progress'
+                          ? 'text-gray-200'
+                          : s.status === 'completed'
+                          ? 'text-gray-400'
+                          : 'text-gray-600'
+                      }
+                    >
+                      {s.label}
                     </span>
                   </div>
-
-                  {streamingProgress.thoughts?.length > 0 && (
-                    <div className="mt-1.5 space-y-0.5 text-xs text-gray-500">
-                      {streamingProgress.thoughts.map((t, i) => (
-                        <div key={i} className="truncate">• {t}</div>
-                      ))}
-                    </div>
-                  )}
-
-                  {streamingProgress.steps?.length > 0 && (
-                    <div className="mt-1.5 space-y-1">
-                      {streamingProgress.steps.map((s, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs">
-                          <span
-                            className={
-                              s.status === 'completed'
-                                ? 'text-green-400'
-                                : s.status === 'in-progress'
-                                ? 'text-gray-200'
-                                : 'text-gray-600'
-                            }
-                          >
-                            •
-                          </span>
-                          <span
-                            className={
-                              s.status === 'in-progress'
-                                ? 'text-gray-200'
-                                : s.status === 'completed'
-                                ? 'text-gray-400'
-                                : 'text-gray-600'
-                            }
-                          >
-                            {s.label}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw]}
-                components={markdownComponents}
-              >
-                {message.content}
-              </ReactMarkdown>
-              {message.streaming && (
-                <span className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-gray-400 animate-pulse" />
-              )}
-            </div>
-            {!isUser && (
-              <MessageActions content={message.content} onRegenerate={onRegenerate} />
+                ))}
+              </div>
             )}
+          </div>
+        )}
+
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeRaw]}
+          components={markdownComponents}
+        >
+          {message.content}
+        </ReactMarkdown>
+        {message.streaming && (
+          <span className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-gray-400 animate-pulse" />
+        )}
+      </div>
+    );
+
+    // User messages: actions live below the bubble (not inside it)
+    if (isUser) {
+      return (
+        <div key={index} className="py-4 px-4">
+          <div className="max-w-3xl mx-auto flex justify-end">
+            <div className="max-w-[80%] flex flex-col items-end gap-1">
+              <div className="w-full px-4 py-3 rounded-2xl bg-[#2a2b32] text-gray-100">
+                {bubbleInner}
+              </div>
+              <UserActions
+                content={message.content}
+                onEdit={() => {
+                  setEditValue(message.content);
+                  setEditIndex(index);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={index} className="py-4 px-4">
+        <div className="max-w-3xl mx-auto flex justify-start">
+          <div className="max-w-[80%] px-4 py-3 rounded-lg text-gray-100">
+            {bubbleInner}
+            <MessageActions content={message.content} onRegenerate={onRegenerate} />
           </div>
         </div>
       </div>

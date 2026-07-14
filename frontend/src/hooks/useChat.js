@@ -52,6 +52,52 @@ export const useChat = (threadId) => {
     });
   };
 
+  const handleStreamError = (err) => {
+    setError('Streaming error occurred');
+    setMessages(prev => prev.filter(m => !m.streaming));
+    setStreamingProgress(null);
+    setLoading(false);
+  };
+
+  // Shared SSE handler for the chatbot path (token streaming + live thinking)
+  const handleChatChunk = (data) => {
+    if (data.error) {
+      setError(data.error);
+      setMessages(prev => prev.filter(m => !m.streaming));
+      setStreamingProgress(null);
+      setLoading(false);
+      return;
+    }
+
+    if (data.message_type === 'thinking') {
+      setStreamingProgress(prev =>
+        prev
+          ? { ...prev, current: data.content, thoughts: [...(prev.thoughts || []), data.content] }
+          : prev
+      );
+    } else if (data.message_type === 'ai') {
+      setStreamingProgress(prev =>
+        prev ? { ...prev, current: 'Generating response...' } : prev
+      );
+      setMessages(prev => {
+        const copy = [...prev];
+        const idx = copy.findIndex(m => m.streaming);
+        if (idx !== -1) {
+          copy[idx] = { ...copy[idx], content: copy[idx].content + data.content };
+        }
+        return copy;
+      });
+    }
+
+    if (data.done) {
+      setMessages(prev =>
+        prev.map(m => (m.streaming ? { ...m, streaming: false } : m))
+      );
+      setStreamingProgress(null);
+      setLoading(false);
+    }
+  };
+
   const sendMessage = async (message, tools = []) => {
     if (!threadId || !message.trim()) return;
 
@@ -173,45 +219,7 @@ export const useChat = (threadId) => {
         },
       ]);
 
-      const handleMessage = (data) => {
-        if (data.error) {
-          setError(data.error);
-          setMessages(prev => prev.filter(m => !m.streaming));
-          setStreamingProgress(null);
-          setLoading(false);
-          return;
-        }
-
-        if (data.message_type === 'thinking') {
-          setStreamingProgress(prev =>
-            prev
-              ? { ...prev, current: data.content, thoughts: [...(prev.thoughts || []), data.content] }
-              : prev
-          );
-        } else if (data.message_type === 'ai') {
-          setStreamingProgress(prev =>
-            prev ? { ...prev, current: 'Generating response...' } : prev
-          );
-          setMessages(prev => {
-            const copy = [...prev];
-            const idx = copy.findIndex(m => m.streaming);
-            if (idx !== -1) {
-              copy[idx] = { ...copy[idx], content: copy[idx].content + data.content };
-            }
-            return copy;
-          });
-        }
-
-        if (data.done) {
-          setMessages(prev =>
-            prev.map(m => (m.streaming ? { ...m, streaming: false } : m))
-          );
-          setStreamingProgress(null);
-          setLoading(false);
-        }
-      };
-
-      chatService.streamMessage(threadId, message, tools, handleMessage, handleError);
+      chatService.streamMessage(threadId, message, tools, handleChatChunk, handleStreamError);
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);
@@ -267,12 +275,54 @@ export const useChat = (threadId) => {
     }
   };
 
+  const editMessage = async (newContent, messageIndex) => {
+    if (!threadId || !newContent.trim()) return;
+
+    // 0-based index of the edited human message among all human turns
+    const humanIndex = messages.slice(0, messageIndex + 1).filter(m => m.type === 'human').length - 1;
+    const targetMsg = messages[messageIndex];
+    const tools = targetMsg?.tools && targetMsg.tools.length > 0 ? targetMsg.tools : [];
+
+    try {
+      setLoading(true);
+      setError(null);
+      setStreamingProgress({
+        isStreaming: true,
+        toolName: 'chat',
+        current: 'Updating...',
+        thoughts: [],
+      });
+
+      // Rewrite the edited message, drop everything after it, and add a
+      // placeholder bubble that fills live (like regenerate).
+      setMessages(prev => {
+        const updated = prev.slice(0, messageIndex + 1);
+        updated[messageIndex] = { ...updated[messageIndex], content: newContent, streaming: false };
+        updated.push({
+          type: 'ai',
+          content: '',
+          timestamp: new Date().toISOString(),
+          streaming: true,
+        });
+        return updated;
+      });
+
+      chatService.editStream(threadId, newContent, humanIndex, tools, handleChatChunk, handleStreamError);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error editing message:', err);
+      setStreamingProgress(null);
+      setLoading(false);
+    }
+  };
+
   return {
     messages,
     loading,
     error,
     sendMessage,
     regenerate,
+    editMessage,
     loadMessages,
     streamingProgress,
   };

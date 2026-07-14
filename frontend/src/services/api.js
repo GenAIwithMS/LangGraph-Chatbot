@@ -58,6 +58,63 @@ export const chatService = {
     return eventSource;
   },
 
+  // Edit a previously sent user message and stream the regenerated response.
+  // Uses POST (because editing mutates state) with a manual SSE read.
+  editStream: (threadId, message, index, tools = [], onMessage, onError) => {
+    const body = {
+      thread_id: threadId,
+      message: message,
+      index: index,
+      tools: tools.length > 0 ? tools : undefined,
+    };
+
+    fetch(`${API_BASE_URL}/chat/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          if (onError) onError(new Error(`Edit failed (${response.status})`));
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        const read = () => {
+          reader.read().then(({ done, value }) => {
+            if (done) return;
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop() || '';
+            for (const part of parts) {
+              const trimmed = part.trim();
+              if (!trimmed.startsWith('data:')) continue;
+              const data = trimmed.slice(5).trim();
+              if (data === '[DONE]') continue;
+              try {
+                onMessage(JSON.parse(data));
+              } catch (error) {
+                console.error('Error parsing message:', error);
+              }
+            }
+            read();
+          }).catch((err) => {
+            console.error('Edit stream error:', err);
+            if (onError) onError(err);
+          });
+        };
+
+        read();
+      })
+      .catch((err) => {
+        console.error('Edit fetch error:', err);
+        if (onError) onError(err);
+      });
+  },
+
   // Get all threads
   getThreads: async () => {
     const response = await api.get('/threads');
