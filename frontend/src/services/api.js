@@ -31,9 +31,14 @@ export const chatService = {
 
   // Stream messages (using EventSource for SSE)
   streamMessage: (threadId, message, tools = [], onMessage, onError) => {
-    const toolsParam = tools.length > 0 ? `&tools=${tools.join(',')}` : '';
+    const params = new URLSearchParams();
+    params.set('message', message);
+    // Omit thread_id for a brand-new ("New Chat") conversation so the backend
+    // creates the thread and returns its id in the final `done` event.
+    if (threadId) params.set('thread_id', threadId);
+    if (tools.length > 0) params.set('tools', tools.join(','));
     const eventSource = new EventSource(
-      `${API_BASE_URL}/chat/stream?thread_id=${threadId}&message=${encodeURIComponent(message)}${toolsParam}`
+      `${API_BASE_URL}/chat/stream?${params.toString()}`
     );
 
     eventSource.onmessage = (event) => {
@@ -43,6 +48,11 @@ export const chatService = {
       }
       try {
         const data = JSON.parse(event.data);
+        // Close on terminal events so the browser doesn't surface a false
+        // "connection closed" error when the backend ends the stream.
+        if (data.done || data.error) {
+          eventSource.close();
+        }
         onMessage(data);
       } catch (error) {
         console.error('Error parsing message:', error);
@@ -50,12 +60,73 @@ export const chatService = {
     };
 
     eventSource.onerror = (error) => {
-      console.error('EventSource error:', error);
-      eventSource.close();
-      if (onError) onError(error);
+      // EventSource fires "error" on a normal connection close too. Only surface
+      // it as a real error if the connection is still open/connecting.
+      if (eventSource.readyState !== EventSource.CLOSED) {
+        console.error('EventSource error:', error);
+        eventSource.close();
+        if (onError) onError(error);
+      }
     };
 
     return eventSource;
+  },
+
+  // Edit a previously sent user message and stream the regenerated response.
+  // Uses POST (because editing mutates state) with a manual SSE read.
+  editStream: (threadId, message, index, tools = [], onMessage, onError) => {
+    const body = {
+      thread_id: threadId,
+      message: message,
+      index: index,
+      tools: tools.length > 0 ? tools : undefined,
+    };
+
+    fetch(`${API_BASE_URL}/chat/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          if (onError) onError(new Error(`Edit failed (${response.status})`));
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        const read = () => {
+          reader.read().then(({ done, value }) => {
+            if (done) return;
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop() || '';
+            for (const part of parts) {
+              const trimmed = part.trim();
+              if (!trimmed.startsWith('data:')) continue;
+              const data = trimmed.slice(5).trim();
+              if (data === '[DONE]') continue;
+              try {
+                onMessage(JSON.parse(data));
+              } catch (error) {
+                console.error('Error parsing message:', error);
+              }
+            }
+            read();
+          }).catch((err) => {
+            console.error('Edit stream error:', err);
+            if (onError) onError(err);
+          });
+        };
+
+        read();
+      })
+      .catch((err) => {
+        console.error('Edit fetch error:', err);
+        if (onError) onError(err);
+      });
   },
 
   // Get all threads

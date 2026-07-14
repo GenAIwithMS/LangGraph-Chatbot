@@ -6,6 +6,7 @@ import os
 from app.schema.models import (
     ChatRequest,
     RegenerateRequest,
+    EditMessageRequest,
     ChatResponse,
     ThreadListResponse,
     ThreadHistoryResponse,
@@ -53,6 +54,30 @@ async def regenerate(request: RegenerateRequest):
     try:
         result = ChatService.regenerate_message(request.thread_id, request.tools)
         return ChatResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@chat_router.post("/chat/edit", response_model=ChatResponse)
+async def edit_message(request: EditMessageRequest):
+    try:
+        # Edit is a state mutation that must be performed before streaming, so we
+        # validate and apply it here, then stream the regenerated response back.
+        def generate_stream():
+            try:
+                for chunk in ChatService.edit_message_stream(
+                    request.thread_id, request.message, request.index, request.tools
+                ):
+                    yield f"data: {json.dumps(chunk)}\n\n"
+
+                yield f"data: {json.dumps({'thread_id': request.thread_id, 'done': True})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream"
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

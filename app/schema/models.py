@@ -17,6 +17,15 @@ class RegenerateRequest(BaseModel):
     tools: Optional[List[str]] = Field(None, description="List of tools used (e.g., ['blogs'])")
 
 
+class EditMessageRequest(BaseModel):
+    """Request model for editing a previously sent user message"""
+
+    thread_id: str = Field(..., description="Thread ID for the conversation")
+    message: str = Field(..., description="New (edited) content of the user message")
+    index: int = Field(..., description="0-based index of the human message among human turns")
+    tools: Optional[List[str]] = Field(None, description="List of tools used (e.g., ['blogs'])")
+
+
 class ChatResponse(BaseModel):
     """Response model for chat messages"""
 
