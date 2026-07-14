@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { chatService } from '../services/api';
 
-export const useChat = (threadId) => {
+export const useChat = (threadId, onThreadCreated) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -90,6 +90,11 @@ export const useChat = (threadId) => {
     }
 
     if (data.done) {
+      // If the backend created a brand-new thread (first message in a New Chat),
+      // update the URL silently via the callback from App.
+      if (data.thread_id && onThreadCreated && data.thread_id !== threadId) {
+        onThreadCreated(data.thread_id);
+      }
       setMessages(prev =>
         prev.map(m => (m.streaming ? { ...m, streaming: false } : m))
       );
@@ -99,7 +104,7 @@ export const useChat = (threadId) => {
   };
 
   const sendMessage = async (message, tools = []) => {
-    if (!threadId || !message.trim()) return;
+    if (!message.trim()) return;
 
     try {
       setLoading(true);
@@ -187,6 +192,9 @@ export const useChat = (threadId) => {
           }
 
           if (data.done) {
+            if (data.thread_id && onThreadCreated && data.thread_id !== threadId) {
+              onThreadCreated(data.thread_id);
+            }
             setMessages(prev => [...prev, {
               type: 'ai',
               content: aiResponse,

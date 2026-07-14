@@ -31,9 +31,14 @@ export const chatService = {
 
   // Stream messages (using EventSource for SSE)
   streamMessage: (threadId, message, tools = [], onMessage, onError) => {
-    const toolsParam = tools.length > 0 ? `&tools=${tools.join(',')}` : '';
+    const params = new URLSearchParams();
+    params.set('message', message);
+    // Omit thread_id for a brand-new ("New Chat") conversation so the backend
+    // creates the thread and returns its id in the final `done` event.
+    if (threadId) params.set('thread_id', threadId);
+    if (tools.length > 0) params.set('tools', tools.join(','));
     const eventSource = new EventSource(
-      `${API_BASE_URL}/chat/stream?thread_id=${threadId}&message=${encodeURIComponent(message)}${toolsParam}`
+      `${API_BASE_URL}/chat/stream?${params.toString()}`
     );
 
     eventSource.onmessage = (event) => {

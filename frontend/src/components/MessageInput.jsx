@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, Paperclip, FileText, Loader2, Wrench, Search, FileEdit, X } from "lucide-react";
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from "./ui/prompt-input";
 
-const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, documentInfo, uploadingPDF, currentThreadId }) => {
+const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, documentInfo, uploadingPDF }) => {
   const [message, setMessage] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
@@ -10,11 +10,9 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
   const fileInputRef = useRef(null);
   const toolsMenuRef = useRef(null);
 
-  // Keep the input writable while the agent is generating, but block sending.
-  // `disabled` (= chatLoading || uploadingPDF || !currentThreadId) still
-  // prevents submitting; the textarea itself is only locked while a PDF is
-  // uploading or no thread exists yet.
-  const inputDisabled = uploadingPDF || !currentThreadId;
+  // Keep the textarea writable while the agent is generating (submitting is
+  // still blocked via `disabled`). Only lock the field while a PDF is uploading.
+  const inputDisabled = uploadingPDF;
 
   // Close tools menu when clicking outside
   useEffect(() => {

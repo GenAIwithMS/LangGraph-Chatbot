@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
@@ -7,8 +8,23 @@ import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { chatService } from './services/api';
 
+// Derive the active thread id from the URL path:
+//   /                 -> new chat
+//   /chat             -> new chat
+//   /chat/new         -> new chat
+//   /chat/<threadId>  -> that thread
+function threadIdFromPath(pathname) {
+  const path = pathname.replace(/\/+$/, '');
+  if (path === '' || path === '/chat' || path === '/chat/new') return null;
+  const m = path.match(/^\/chat\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 function App() {
-  const [currentThreadId, setCurrentThreadId] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const urlThreadId = threadIdFromPath(location.pathname);
+  const [currentThreadId, setCurrentThreadId] = useState(urlThreadId || null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [documentInfo, setDocumentInfo] = useState(null);
   const [uploadingPDF, setUploadingPDF] = useState(false);
@@ -20,9 +36,22 @@ function App() {
     loading: threadsLoading,
     error: threadsError,
     fetchThreads,
-    createNewThread,
     updateThreadTitle,
   } = useThreads();
+
+  // Keep the active thread in sync with the URL (deep links, back/forward).
+  useEffect(() => {
+    const id = urlThreadId || null;
+    setCurrentThreadId((prev) => (prev === id ? prev : id));
+  }, [urlThreadId]);
+
+  // Called when the backend creates a brand-new thread (first message in a
+  // "New Chat"). Silently updates the URL without interrupting the user.
+  const handleThreadCreated = (id) => {
+    setCurrentThreadId(id);
+    navigate(`/chat/${id}`, { replace: true });
+    fetchThreads();
+  };
 
   const {
     messages,
@@ -33,7 +62,7 @@ function App() {
     editMessage,
     loadMessages,
     streamingProgress,
-  } = useChat(currentThreadId);
+  } = useChat(currentThreadId, handleThreadCreated);
 
   // Load document info when thread changes
   useEffect(() => {
@@ -56,17 +85,18 @@ function App() {
     }
   };
 
-  const handleNewThread = async () => {
-    const newThreadId = await createNewThread();
-    if (newThreadId) {
-      setCurrentThreadId(newThreadId);
-      setIsSidebarOpen(false);
-    }
+  const handleNewThread = () => {
+    // New chat stays client-side until the first message is sent; the backend
+    // then creates the thread and the URL is updated silently.
+    setCurrentThreadId(null);
+    setIsSidebarOpen(false);
+    navigate('/chat');
   };
 
   const handleThreadSelect = (threadId) => {
     setCurrentThreadId(threadId);
     setIsSidebarOpen(false);
+    navigate(`/chat/${threadId}`);
   };
 
   const handleThreadDelete = (threadId) => {
@@ -81,13 +111,16 @@ function App() {
       // Call the delete API
       await chatService.deleteThread(threadToDelete);
       
-      // If deleting current thread, switch to another or create new
+      // If deleting current thread, switch to another or go to new chat
       if (threadToDelete === currentThreadId) {
         const remainingThreads = threads.filter(t => t.thread_id !== threadToDelete);
         if (remainingThreads.length > 0) {
-          setCurrentThreadId(remainingThreads[0].thread_id);
+          const nextId = remainingThreads[0].thread_id;
+          setCurrentThreadId(nextId);
+          navigate(`/chat/${nextId}`);
         } else {
-          await handleNewThread();
+          setCurrentThreadId(null);
+          navigate('/chat');
         }
       }
       
@@ -110,15 +143,13 @@ function App() {
 
   const handleSendMessage = async (message, tools = []) => {
     await sendMessage(message, tools);
-    // Refresh threads to update titles if it's a new conversation
-    if (messages.length === 0) {
-      fetchThreads();
-    }
+    // Refresh threads so a newly created chat (and updated titles) show in the sidebar
+    fetchThreads();
   };
 
   const handleUploadPDF = async (file) => {
     if (!currentThreadId) {
-      alert('Please create a new thread first');
+      alert('Please send a message first to start a chat.');
       return;
     }
 
@@ -140,15 +171,6 @@ function App() {
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
-
-  // Create initial thread if none exists - runs only once on mount
-  useEffect(() => {
-    if (!threadsLoading && threads.length === 0 && !currentThreadId) {
-      handleNewThread();
-    } else if (!currentThreadId && threads.length > 0) {
-      setCurrentThreadId(threads[0].thread_id);
-    }
-  }, [threadsLoading]); // Only depend on loading state, not threads array
 
   return (
     <div className="flex h-screen bg-chat-bg text-white overflow-hidden">
@@ -189,8 +211,7 @@ function App() {
           <MessageInput
             onSendMessage={handleSendMessage}
             onUploadPDF={handleUploadPDF}
-            disabled={chatLoading || uploadingPDF || !currentThreadId}
-            currentThreadId={currentThreadId}
+            disabled={chatLoading || uploadingPDF}
             hasDocument={documentInfo?.has_document}
             documentInfo={documentInfo}
             uploadingPDF={uploadingPDF}
