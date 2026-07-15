@@ -335,9 +335,11 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
     }
   };
 
-  // Abort an in-flight generation. Closes the SSE connection, drops the
-  // partial assistant bubble (and the just-sent human message so the prompt
-  // can return to the input box), and returns the cancelled prompt text.
+  // Abort an in-flight generation. Closes the SSE connection so streaming
+  // stops at the current point, then keeps the partial assistant message
+  // (marked as finished) visible to the user and removes the just-sent human
+  // message so the prompt can return to the input box. Returns the cancelled
+  // prompt text.
   const stop = () => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -347,7 +349,9 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
     setStreamingProgress(null);
     setMessages(prev => {
       const hadStreaming = prev.some(m => m.streaming);
-      const next = prev.filter(m => !m.streaming);
+      // Keep the partial response, just stop the streaming indicator.
+      const next = prev.map(m => (m.streaming ? { ...m, streaming: false } : m));
+      // Drop the just-sent human message so the prompt returns to the input.
       if (hadStreaming && next.length && next[next.length - 1]?.type === 'human') {
         return next.slice(0, -1);
       }
