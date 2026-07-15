@@ -66,6 +66,7 @@ function App() {
     editMessage,
     loadMessages,
     streamingProgress,
+    stop,
   } = useChat(currentThreadId, handleThreadCreated, skipLoadRef);
 
   // Load document info when thread changes
@@ -215,6 +216,7 @@ function App() {
           <MessageInput
             onSendMessage={handleSendMessage}
             onUploadPDF={handleUploadPDF}
+            onStop={stop}
             disabled={chatLoading || uploadingPDF}
             hasDocument={documentInfo?.has_document}
             documentInfo={documentInfo}

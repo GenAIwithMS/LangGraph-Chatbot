@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { chatService } from '../services/api';
 
 export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
@@ -6,6 +6,8 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [streamingProgress, setStreamingProgress] = useState(null);
+  const eventSourceRef = useRef(null);
+  const lastPromptRef = useRef('');
 
   useEffect(() => {
     if (threadId) {
@@ -113,6 +115,8 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
   const sendMessage = async (message, tools = []) => {
     if (!message.trim()) return;
 
+    lastPromptRef.current = message;
+
     try {
       setLoading(true);
       setError(null);
@@ -212,7 +216,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
           }
         };
 
-        chatService.streamMessage(threadId, message, tools, handleMessage, handleError);
+        eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleMessage, handleError);
         return;
       }
 
@@ -234,7 +238,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
         },
       ]);
 
-      chatService.streamMessage(threadId, message, tools, handleChatChunk, handleStreamError);
+      eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleChatChunk, handleStreamError);
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);
@@ -331,6 +335,27 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
     }
   };
 
+  // Abort an in-flight generation. Closes the SSE connection, drops the
+  // partial assistant bubble (and the just-sent human message so the prompt
+  // can return to the input box), and returns the cancelled prompt text.
+  const stop = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setLoading(false);
+    setStreamingProgress(null);
+    setMessages(prev => {
+      const hadStreaming = prev.some(m => m.streaming);
+      const next = prev.filter(m => !m.streaming);
+      if (hadStreaming && next.length && next[next.length - 1]?.type === 'human') {
+        return next.slice(0, -1);
+      }
+      return next;
+    });
+    return lastPromptRef.current || '';
+  };
+
   return {
     messages,
     loading,
@@ -340,5 +365,6 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
     editMessage,
     loadMessages,
     streamingProgress,
+    stop,
   };
 };

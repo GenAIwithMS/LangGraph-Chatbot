@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, FileText, Loader2, Wrench, Search, FileEdit, X } from "lucide-react";
+import { Send, Square, Paperclip, FileText, Loader2, Wrench, Search, FileEdit, X } from "lucide-react";
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from "./ui/prompt-input";
 
-const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, documentInfo, uploadingPDF }) => {
+const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocument, documentInfo, uploadingPDF }) => {
   const [message, setMessage] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
@@ -36,6 +36,14 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
       setSelectedTools([]);
     }
   };
+
+  const handleStop = () => {
+    const prompt = onStop?.();
+    if (prompt) setMessage(prompt);
+  };
+
+  // While the agent is streaming, the send button becomes a stop button.
+  const showStop = disabled && !uploadingPDF;
 
   const handleToolSelect = (tool) => {
     if (!selectedTools.includes(tool)) {
@@ -167,16 +175,27 @@ const MessageInput = ({ onSendMessage, onUploadPDF, disabled, hasDocument, docum
             ))}
           </div>
 
-          {/* Send Button */}
-          <PromptInputAction tooltip="Send message">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!message.trim() || disabled}
-              className="p-2 text-gray-400 hover:text-white disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
-            >
-              <Send size={18} />
-            </button>
+          {/* Send / Stop Button */}
+          <PromptInputAction tooltip={showStop ? "Stop generating" : "Send message"}>
+            {showStop ? (
+              <button
+                type="button"
+                onClick={handleStop}
+                className="p-2 text-red-400 hover:text-red-300 hover:bg-gray-700 rounded-lg transition-colors"
+                title="Stop generating"
+              >
+                <Square size={18} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!message.trim() || disabled}
+                className="p-2 text-gray-400 hover:text-white disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send size={18} />
+              </button>
+            )}
           </PromptInputAction>
         </PromptInputActions>
 
