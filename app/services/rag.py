@@ -158,17 +158,9 @@ def retrieve_from_document(query: str, thread_id: str) -> dict:
 
     # Use the retriever API to fetch relevant documents
     try:
-        print(f"[DEBUG RAG] Calling retriever.get_relevant_documents with query: {query[:50]}...")
-        results = retriever.get_relevant_documents(query)
+        print(f"[DEBUG RAG] Calling retriever.invoke with query: {query[:50]}...")
+        results = retriever.invoke(query)
         print(f"[DEBUG RAG] Successfully retrieved {len(results)} documents")
-    except AttributeError as ae:
-        print(f"[DEBUG RAG] AttributeError: {ae}, trying invoke method")
-        try:
-            results = retriever.invoke(query)
-            print(f"[DEBUG RAG] Successfully retrieved {len(results)} documents via invoke")
-        except Exception as e:
-            print(f"[DEBUG RAG] Invoke also failed: {e}")
-            return {"error": f"Retriever invocation failed: {e}", "query": query}
     except Exception as e:
         print(f"[DEBUG RAG] Exception during retrieval: {type(e).__name__}: {e}")
         return {"error": f"Retrieval failed: {e}", "query": query}
