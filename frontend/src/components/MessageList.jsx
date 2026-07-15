@@ -210,24 +210,14 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
   const [editIndex, setEditIndex] = useState(null);
   const [editValue, setEditValue] = useState('');
 
-  const scrollToBottom = (smooth = true) => {
-    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   };
 
   useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    const isInitialLoad = previousLengthRef.current === 0 && messages.length > 0;
-    const isNewUserMessage =
-      messages.length > previousLengthRef.current && lastMessage?.type === 'human';
-
-    // Follow the text live while the assistant is generating; use instant
-    // scrolling so each streamed token keeps the latest content in view.
-    if (streaming) {
-      scrollToBottom(false);
-    } else if (isInitialLoad || isNewUserMessage) {
-      scrollToBottom(true);
-    }
-
+    // Always keep the latest content in view: initial load, switching between
+    // conversations, sending a new message, and live streaming.
+    scrollToBottom();
     previousLengthRef.current = messages.length;
   }, [messages, streaming]);
 
