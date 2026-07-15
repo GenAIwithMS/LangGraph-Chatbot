@@ -211,21 +211,15 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
   const [editValue, setEditValue] = useState('');
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   };
 
   useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    const isInitialLoad = previousLengthRef.current === 0 && messages.length > 0;
-    const isNewUserMessage =
-      messages.length > previousLengthRef.current && lastMessage?.type === 'human';
-
-    if (isInitialLoad || isNewUserMessage) {
-      scrollToBottom();
-    }
-
+    // Always keep the latest content in view: initial load, switching between
+    // conversations, sending a new message, and live streaming.
+    scrollToBottom();
     previousLengthRef.current = messages.length;
-  }, [messages]);
+  }, [messages, streaming]);
 
   const renderMessage = (message, index) => {
     const isUser = message.type === 'human';

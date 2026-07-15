@@ -11,9 +11,10 @@ def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
     if not os.getenv("TAVILY_API_KEY"):
         return []
     try:
-        from langchain_community.tools.tavily_search import TavilySearchResults  # type: ignore
-        tool = TavilySearchResults(max_results=max_results)
-        results = tool.invoke({"query": query})
+        from tavily import TavilyClient
+        client = TavilyClient()
+        data = client.search(query=query, max_results=max_results)
+        results = data.get("results", [])
         out: List[dict] = []
         for r in results or []:
             out.append(

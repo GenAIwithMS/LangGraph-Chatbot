@@ -1,14 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { chatService } from '../services/api';
 
-export const useChat = (threadId, onThreadCreated) => {
+export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [streamingProgress, setStreamingProgress] = useState(null);
+  const eventSourceRef = useRef(null);
+  const lastPromptRef = useRef('');
 
   useEffect(() => {
     if (threadId) {
+      // When a brand-new thread was just created by streaming the first
+      // message, the UI already holds the messages — skip the backend reload
+      // (which can briefly return an empty/partial state and wipe the answer).
+      if (skipLoadRef?.current) {
+        skipLoadRef.current = false;
+        return;
+      }
       loadMessages();
     } else {
       setMessages([]);
@@ -105,6 +114,8 @@ export const useChat = (threadId, onThreadCreated) => {
 
   const sendMessage = async (message, tools = []) => {
     if (!message.trim()) return;
+
+    lastPromptRef.current = message;
 
     try {
       setLoading(true);
@@ -205,7 +216,7 @@ export const useChat = (threadId, onThreadCreated) => {
           }
         };
 
-        chatService.streamMessage(threadId, message, tools, handleMessage, handleError);
+        eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleMessage, handleError);
         return;
       }
 
@@ -227,7 +238,7 @@ export const useChat = (threadId, onThreadCreated) => {
         },
       ]);
 
-      chatService.streamMessage(threadId, message, tools, handleChatChunk, handleStreamError);
+      eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleChatChunk, handleStreamError);
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);
@@ -324,6 +335,31 @@ export const useChat = (threadId, onThreadCreated) => {
     }
   };
 
+  // Abort an in-flight generation. Closes the SSE connection so streaming
+  // stops at the current point, then keeps the partial assistant message
+  // (marked as finished) visible to the user and removes the just-sent human
+  // message so the prompt can return to the input box. Returns the cancelled
+  // prompt text.
+  const stop = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setLoading(false);
+    setStreamingProgress(null);
+    setMessages(prev => {
+      const hadStreaming = prev.some(m => m.streaming);
+      // Keep the partial response, just stop the streaming indicator.
+      const next = prev.map(m => (m.streaming ? { ...m, streaming: false } : m));
+      // Drop the just-sent human message so the prompt returns to the input.
+      if (hadStreaming && next.length && next[next.length - 1]?.type === 'human') {
+        return next.slice(0, -1);
+      }
+      return next;
+    });
+    return lastPromptRef.current || '';
+  };
+
   return {
     messages,
     loading,
@@ -333,5 +369,6 @@ export const useChat = (threadId, onThreadCreated) => {
     editMessage,
     loadMessages,
     streamingProgress,
+    stop,
   };
 };

@@ -19,3 +19,4 @@ requests
 pypdf
 sqlalchemy
 pymysql
+tavily-python

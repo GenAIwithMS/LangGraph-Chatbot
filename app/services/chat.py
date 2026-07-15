@@ -284,6 +284,13 @@ class ChatService:
             [HumanMessage(content=human_message)] if human_message is not None else []
         )
 
+        # Streamed text can arrive either in ``content`` (the final answer) or,
+        # for reasoning models like gpt-oss, in ``additional_kwargs.reasoning_content``
+        # (the chain-of-thought). Keep the answer in the response bubble and the
+        # reasoning in the thinking bar so the saved response stays clean.
+        answer_parts = []
+        reasoning_parts = []
+
         for message_chunk, metadata in chatbot.stream(
             {
                 "messages": input_messages,
@@ -315,18 +322,36 @@ class ChatService:
                         }
 
                 content = message_chunk.content
-                if not content:
-                    continue
-                if isinstance(content, list):
-                    text = "".join(
-                        c if isinstance(c, str)
-                        else (c.get("text", "") if isinstance(c, dict) else "")
-                        for c in content
+                reasoning = message_chunk.additional_kwargs.get("reasoning_content", "")
+                # The actual answer arrives in ``content`` -> response bubble.
+                if isinstance(content, str) and content:
+                    answer_parts.append(content)
+                    yield {"content": content, "message_type": "ai"}
+                # The model's chain-of-thought arrives in ``reasoning_content``
+                # -> thinking bar (kept out of the saved response).
+                if reasoning:
+                    reasoning_parts.append(reasoning)
+                    yield {"content": reasoning, "message_type": "thinking"}
+
+        # Persist the full assistant response. langgraph's streamed-chunk merge
+        # leaves the stored AIMessage empty for this model, so write it back
+        # explicitly: drop the trailing (empty) assistant message and append one
+        # with the real content. The answer lives in ``content``; only fall back
+        # to reasoning when the model emitted no final answer.
+        persist_text = "".join(answer_parts).strip() or "".join(reasoning_parts).strip()
+        if persist_text:
+            try:
+                current = chatbot.get_state(config=config)
+                msgs = list(current.values.get("messages", []))
+                if msgs and isinstance(msgs[-1], AIMessage):
+                    chatbot.update_state(
+                        config, {"messages": [RemoveMessage(id=msgs[-1].id)]}
                     )
-                else:
-                    text = str(content)
-                if text:
-                    yield {"content": text, "message_type": "ai"}
+                chatbot.update_state(
+                    config, {"messages": [AIMessage(content=persist_text)]}
+                )
+            except Exception as e:
+                print(f"Error persisting final assistant message: {e}")
 
     @staticmethod
     def stream_message(message: str, thread_id: str, tools: Optional[List[str]] = None):
