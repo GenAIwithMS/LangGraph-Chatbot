@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { chatService } from '../services/api';
 
-export const useChat = (threadId, onThreadCreated) => {
+export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -9,6 +9,13 @@ export const useChat = (threadId, onThreadCreated) => {
 
   useEffect(() => {
     if (threadId) {
+      // When a brand-new thread was just created by streaming the first
+      // message, the UI already holds the messages — skip the backend reload
+      // (which can briefly return an empty/partial state and wipe the answer).
+      if (skipLoadRef?.current) {
+        skipLoadRef.current = false;
+        return;
+      }
       loadMessages();
     } else {
       setMessages([]);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
@@ -25,6 +25,9 @@ function App() {
   const navigate = useNavigate();
   const urlThreadId = threadIdFromPath(location.pathname);
   const [currentThreadId, setCurrentThreadId] = useState(urlThreadId || null);
+  // Set right before navigating to a freshly created thread so useChat skips
+  // its backend reload (the messages were just streamed into the UI).
+  const skipLoadRef = useRef(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [documentInfo, setDocumentInfo] = useState(null);
   const [uploadingPDF, setUploadingPDF] = useState(false);
@@ -48,6 +51,7 @@ function App() {
   // Called when the backend creates a brand-new thread (first message in a
   // "New Chat"). Silently updates the URL without interrupting the user.
   const handleThreadCreated = (id) => {
+    skipLoadRef.current = true;
     setCurrentThreadId(id);
     navigate(`/chat/${id}`, { replace: true });
     fetchThreads();
@@ -62,7 +66,7 @@ function App() {
     editMessage,
     loadMessages,
     streamingProgress,
-  } = useChat(currentThreadId, handleThreadCreated);
+  } = useChat(currentThreadId, handleThreadCreated, skipLoadRef);
 
   // Load document info when thread changes
   useEffect(() => {
