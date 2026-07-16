@@ -62,3 +62,22 @@ code {
 .animate-scale-in {
   animation: scaleIn 0.3s ease-out;
 }
+
+/* ChatGPT-like thin scrollbar for scrollable lists */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #565869 transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: #565869;
+  border-radius: 3px;
+}
+.thin-scroll:hover::-webkit-scrollbar-thumb {
+  background: #6e6f7e;
+}
