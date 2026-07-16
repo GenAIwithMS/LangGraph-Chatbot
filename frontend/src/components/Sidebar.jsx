@@ -138,25 +138,35 @@ const Sidebar = ({
             w-[60px] bg-sidebar-bg text-white
             transform transition-transform duration-300 ease-in-out
             ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-            flex flex-col items-center py-3
+            flex flex-col items-center py-3 px-2
           `}
         >
+          {/* Brand + collapse toggle row */}
+          <div className="flex items-center justify-between w-full gap-1 mb-2">
+            <span
+              title="OpenGPT"
+              className="flex items-center justify-center w-8 h-9 text-lg font-semibold text-white select-none"
+            >
+              O
+            </span>
+            <button
+              onClick={() => {
+                onToggleCollapse?.();
+                setTimeout(() => searchInputRef.current?.focus(), 50);
+              }}
+              title="Expand sidebar"
+              className="flex items-center justify-center w-8 h-8 rounded-xl hover:bg-gray-700 transition-colors"
+            >
+              <PanelLeftOpen size={18} />
+            </button>
+          </div>
+
           <button
             onClick={onNewThread}
             title="New chat"
-            className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-700 transition-colors"
+            className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-700 transition-colors mt-1"
           >
             <Plus size={20} />
-          </button>
-          <button
-            onClick={() => {
-              onToggleCollapse?.();
-              setTimeout(() => searchInputRef.current?.focus(), 50);
-            }}
-            title="Expand sidebar"
-            className="flex items-center justify-center w-10 h-10 mt-1 rounded-xl hover:bg-gray-700 transition-colors"
-          >
-            <PanelLeftOpen size={20} />
           </button>
         </div>
 
@@ -206,8 +216,22 @@ const Sidebar = ({
           <X size={20} />
         </button>
 
-        {/* Top: New chat + collapse */}
-        <div className="flex items-center gap-1 px-2 pt-2">
+        {/* Brand header */}
+        <div className="flex items-center justify-between px-2 pt-3 pb-1">
+          <span className="px-2 text-base font-semibold tracking-tight text-white select-none">
+            OpenGPT
+          </span>
+          <button
+            onClick={() => onToggleCollapse?.()}
+            title="Close sidebar"
+            className="hidden lg:flex items-center justify-center w-9 h-9 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+          >
+            <PanelLeftClose size={18} />
+          </button>
+        </div>
+
+        {/* New chat */}
+        <div className="flex items-center gap-1 px-2 pt-1">
           <button
             onClick={onNewThread}
             className="group flex items-center gap-2.5 flex-1 px-3 py-2.5 rounded-xl hover:bg-gray-700/80 transition-colors text-left"
@@ -217,13 +241,6 @@ const Sidebar = ({
               <Plus size={18} />
             </span>
             <span className="text-sm font-medium">New chat</span>
-          </button>
-          <button
-            onClick={() => onToggleCollapse?.()}
-            title="Close sidebar"
-            className="hidden lg:flex items-center justify-center w-9 h-9 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-          >
-            <PanelLeftClose size={18} />
           </button>
         </div>
 
