@@ -168,6 +168,17 @@ const Sidebar = ({
           >
             <Plus size={20} />
           </button>
+
+          <button
+            onClick={() => {
+              onToggleCollapse?.();
+              setTimeout(() => searchInputRef.current?.focus(), 50);
+            }}
+            title="Search chats"
+            className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-700 transition-colors mt-1"
+          >
+            <SearchIcon size={18} />
+          </button>
         </div>
 
         <div
