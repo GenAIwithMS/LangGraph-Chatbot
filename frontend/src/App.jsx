@@ -177,6 +177,11 @@ function App() {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((c) => !c);
+  };
+
   return (
     <div className="flex h-screen bg-chat-bg text-white overflow-hidden">
       {/* Sidebar */}
@@ -189,6 +194,8 @@ function App() {
         onThreadDelete={handleThreadDelete}
         isSidebarOpen={isSidebarOpen}
         toggleSidebar={toggleSidebar}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapse}
       />
 
       {/* Main Chat Area */}
