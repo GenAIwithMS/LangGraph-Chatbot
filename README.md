@@ -1,6 +1,6 @@
-# AI Chatbot with LangGraph & RAG
+# OpenGPT
 
-A sophisticated chatbot implementation built using LangGraph, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, and persistent MySQL storage.
+An AI chatbot built with LangGraph & RAG, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, temporary (session-only) chats, and persistent MySQL storage.
 
 ## Features
 
@@ -50,6 +50,7 @@ A sophisticated chatbot implementation built using LangGraph, featuring a FastAP
 1. Make sure MySQL is installed and running
 2. Copy and configure environment variables:
 ```bash
+cd backend
 cp .env.example .env
 ```
 
@@ -71,19 +72,18 @@ See [database/README.md](database/README.md) for detailed database setup instruc
 
 ### Step 2: Start Application
 
-**Option 1: Use Start Script (Windows)**
+**Option 1: Use Start Script**
 
-Simply double-click `start.bat` or run:
-```bash
-start.bat
-```
+- **Windows:** double-click `start.bat` (or run `start.bat` from a terminal).
+- **Linux / macOS:** run `./start.sh`. Make it executable first with `chmod +x start.sh` if needed.
 
-This will start both the backend (port 8000) and frontend (port 3000) automatically.
+These scripts start both the backend (port 8000) and the frontend (port 3000) automatically. The backend uses the project's `.venv` if present; the frontend installs dependencies via `npm install` on first run.
 
 **Option 2: Manual Start**
 
 **1. Start Backend:**
 ```bash
+cd backend
 python main.py
 ```
 
@@ -128,25 +128,26 @@ LANGCHAIN_API_KEY=your_langsmith_key
 
 ```
 .
-├── app/                      # FastAPI application
-│   ├── main.py              # FastAPI app initialization
-│   ├── router/              # API route handlers
-│   │   └── chat.py          # Chat, threads, RAG endpoints
-│   ├── schema/              # Pydantic models
-│   │   └── models.py        # Request/response schemas
-│   ├── services/            # Business logic
-│   │   ├── chatbot_service.py   # LangGraph chatbot
-│   │   ├── chat_service.py      # Chat operations
-│   │   ├── rag_service.py       # RAG/PDF processing
-│   │   └── thread_service.py    # Thread management
-│   └── tools/               # External API tools
-│       └── all_tools.py     # Search, weather, calc, stocks
-├── database/                # Database configuration
-│   ├── schema.sql          # MySQL schema
-│   ├── init_db.py          # Database initialization
-│   ├── config.py           # Database config
-│   ├── mysql_checkpoint.py # Custom MySQL checkpointer
-│   └── README.md           # Database setup guide
+├── backend/                 # FastAPI application
+│   ├── app/                 # Application package
+│   │   ├── main.py          # FastAPI app initialization
+│   │   ├── router/          # API route handlers
+│   │   │   └── chat.py      # Chat, threads, RAG endpoints
+│   │   ├── schema/          # Pydantic models
+│   │   │   └── models.py    # Request/response schemas
+│   │   ├── services/        # Business logic
+│   │   │   ├── chatbot.py   # OpenGPT chatbot graph
+│   │   │   ├── chat.py      # Chat operations
+│   │   │   ├── rag.py       # RAG/document processing
+│   │   │   └── thread.py    # Thread management
+│   │   ├── database/        # Database configuration
+│   │   │   ├── init_db.py   # Database initialization
+│   │   │   ├── config.py    # Database config
+│   │   │   └── mysql_checkpoint.py # Custom MySQL checkpointer
+│   │   └── tools/           # External API tools
+│   │       └── (search, weather, calc, stocks, blogs)
+│   ├── main.py              # Backend entry point
+│   └── requirements.txt     # Python dependencies
 ├── frontend/                # React frontend
 │   ├── src/
 │   │   ├── components/      # React components
@@ -155,8 +156,6 @@ LANGCHAIN_API_KEY=your_langsmith_key
 │   │   └── App.jsx          # Main app
 │   ├── package.json
 │   └── vite.config.js
-├── main.py                  # Backend entry point
-├── requirements.txt         # Python dependencies
 ├── start.bat               # Windows startup script
 └── start.sh                # Linux/Mac startup script
 ```
@@ -208,6 +207,8 @@ LANGCHAIN_API_KEY=your_langsmith_key
 
 ### Backend Development
 ```bash
+cd backend
+
 # Install dependencies
 pip install -r requirements.txt
 

@@ -5,7 +5,7 @@ health_router = APIRouter()
 @health_router.get("/")
 async def root():
     return {
-        "message": "LangGraph Chatbot API",
+        "message": "OpenGPT API",
         "version": "1.0.0",
         "docs": "/docs"
     }

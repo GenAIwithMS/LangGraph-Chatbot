@@ -352,7 +352,7 @@ const Sidebar = ({
             {/* Footer */}
             <div className="px-3 py-3 border-t border-gray-700/60">
               <div className="text-xs text-gray-500 text-center">
-                AI Chatbot with RAG
+                OpenGPT
               </div>
             </div>
           </>
