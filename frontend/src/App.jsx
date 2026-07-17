@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { MessageSquare } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
@@ -50,7 +51,10 @@ function App() {
 
   // Called when the backend creates a brand-new thread (first message in a
   // "New Chat"). Silently updates the URL without interrupting the user.
+  // In temporary-chat mode this is a no-op so the chat never becomes a
+  // persisted thread in the sidebar/history.
   const handleThreadCreated = (id) => {
+    if (isTempChat) return;
     skipLoadRef.current = true;
     setCurrentThreadId(id);
     navigate(`/chat/${id}`, { replace: true });
@@ -94,11 +98,21 @@ function App() {
     // New chat stays client-side until the first message is sent; the backend
     // then creates the thread and the URL is updated silently.
     setCurrentThreadId(null);
+    setIsTempChat(false);
+    setIsSidebarOpen(false);
+    navigate('/chat');
+  };
+
+  // Start a temporary (session-only) chat: not persisted to the sidebar history.
+  const handleStartTempChat = () => {
+    setIsTempChat(true);
+    setCurrentThreadId(null);
     setIsSidebarOpen(false);
     navigate('/chat');
   };
 
   const handleThreadSelect = (threadId) => {
+    setIsTempChat(false);
     setCurrentThreadId(threadId);
     setIsSidebarOpen(false);
     navigate(`/chat/${threadId}`);
@@ -148,8 +162,9 @@ function App() {
 
   const handleSendMessage = async (message, tools = []) => {
     await sendMessage(message, tools);
-    // Refresh threads so a newly created chat (and updated titles) show in the sidebar
-    fetchThreads();
+    // Refresh threads so a newly created chat (and updated titles) show in the
+    // sidebar — skipped for temporary chats, which must not be persisted.
+    if (!isTempChat) fetchThreads();
   };
 
   const handleUploadPDF = async (file) => {
@@ -182,6 +197,10 @@ function App() {
     setIsSidebarCollapsed((c) => !c);
   };
 
+  // Temporary chat mode: the conversation lives only in the current session and
+  // is never added to the persisted sidebar history.
+  const [isTempChat, setIsTempChat] = useState(false);
+
   return (
     <div className="flex h-screen bg-chat-bg text-white overflow-hidden">
       {/* Sidebar */}
@@ -203,9 +222,31 @@ function App() {
         {/* Chat Section */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <div className="flex-shrink-0 border-b border-gray-700 px-4 py-3 bg-chat-bg">
-            <div className="max-w-3xl mx-auto">
-              {/* Empty header or add logo/branding here if needed */}
+          <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-semibold tracking-tight text-white select-none">
+                  OpenGPT
+                </span>
+                {isTempChat && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-300 text-[11px] font-medium">
+                    Temporary
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={handleStartTempChat}
+                title="Start a temporary chat (not saved)"
+                className={`
+                  flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors
+                  ${isTempChat
+                    ? 'bg-yellow-500/20 text-yellow-200'
+                    : 'text-gray-300 hover:text-white hover:bg-gray-700/70'}
+                `}
+              >
+                <MessageSquare size={16} />
+                <span>Temp chat</span>
+              </button>
             </div>
           </div>
 
