@@ -7,8 +7,8 @@ from app.database.init_db import init_database
 
 def create_app():
     app = FastAPI(
-        title="LangGraph Chatbot API",
-        description="FastAPI backend for LangGraph-powered chatbot also multi-thread support",
+        title="OpenGPT API",
+        description="FastAPI backend for OpenGPT, a LangGraph-powered chatbot with multi-thread support",
         version="1.0.0"
     )
 

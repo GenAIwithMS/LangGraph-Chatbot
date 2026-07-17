@@ -1,6 +1,6 @@
-# AI Chatbot Frontend
+# OpenGPT Frontend
 
-A modern React frontend for the AI Chatbot with RAG capabilities, designed with a ChatGPT-like UI using Tailwind CSS.
+A modern React frontend for OpenGPT with RAG capabilities, designed with a ChatGPT-like UI using Tailwind CSS.
 
 ## Features
 

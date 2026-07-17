@@ -1,6 +1,6 @@
-# AI Chatbot with LangGraph & RAG
+# OpenGPT
 
-A sophisticated chatbot implementation built using LangGraph, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, and persistent MySQL storage.
+An AI chatbot built with LangGraph & RAG, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, temporary (session-only) chats, and persistent MySQL storage.
 
 ## Features
 
@@ -72,14 +72,12 @@ See [database/README.md](database/README.md) for detailed database setup instruc
 
 ### Step 2: Start Application
 
-**Option 1: Use Start Script (Windows)**
+**Option 1: Use Start Script**
 
-Simply double-click `start.bat` or run:
-```bash
-start.bat
-```
+- **Windows:** double-click `start.bat` (or run `start.bat` from a terminal).
+- **Linux / macOS:** run `./start.sh`. Make it executable first with `chmod +x start.sh` if needed.
 
-This will start both the backend (port 8000) and frontend (port 3000) automatically.
+These scripts start both the backend (port 8000) and the frontend (port 3000) automatically. The backend uses the project's `.venv` if present; the frontend installs dependencies via `npm install` on first run.
 
 **Option 2: Manual Start**
 
@@ -138,7 +136,7 @@ LANGCHAIN_API_KEY=your_langsmith_key
 │   │   ├── schema/          # Pydantic models
 │   │   │   └── models.py    # Request/response schemas
 │   │   ├── services/        # Business logic
-│   │   │   ├── chatbot.py   # LangGraph chatbot
+│   │   │   ├── chatbot.py   # OpenGPT chatbot graph
 │   │   │   ├── chat.py      # Chat operations
 │   │   │   ├── rag.py       # RAG/document processing
 │   │   │   └── thread.py    # Thread management
