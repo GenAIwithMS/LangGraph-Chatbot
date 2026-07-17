@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
@@ -20,11 +20,69 @@ function threadIdFromPath(pathname) {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+const TempChatIcon = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="lucide lucide-message-circle-dashed lucide-message-circle-dashed"
+    {...props}
+  >
+    <path d="M10.1 2.182a10 10 0 0 1 3.8 0" />
+    <path d="M13.9 21.818a10 10 0 0 1-3.8 0" />
+    <path d="M17.609 3.72a10 10 0 0 1 2.69 2.7" />
+    <path d="M2.182 13.9a10 10 0 0 1 0-3.8" />
+    <path d="M20.28 17.61a10 10 0 0 1-2.7 2.69" />
+    <path d="M21.818 10.1a10 10 0 0 1 0 3.8" />
+    <path d="M3.721 6.391a10 10 0 0 1 2.7-2.69" />
+    <path d="m6.163 21.117-2.906.85a1 1 0 0 1-1.236-1.169l.965-2.98" />
+  </svg>
+);
+
+const TempChatCheckedIcon = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="lucide lucide-message-circle-dashed-check lucide-message-circle-dashed-check"
+    {...props}
+  >
+    <path d="M10.1 2.182a10 10 0 0 1 3.8 0" />
+    <path d="M13.9 21.818a10 10 0 0 1-3.8 0" />
+    <path d="M17.609 3.72a10 10 0 0 1 2.69 2.7" />
+    <path d="M2.182 13.9a10 10 0 0 1 0-3.8" />
+    <path d="M20.28 17.61a10 10 0 0 1-2.7 2.69" />
+    <path d="M21.818 10.1a10 10 0 0 1 0 3.8" />
+    <path d="M3.721 6.391a10 10 0 0 1 2.7-2.69" />
+    <path d="m6.163 21.117-2.906.85a1 1 0 0 1-1.236-1.169l.965-2.98" />
+    <path d="m8.5 12 2.2 2.2 4.8-4.8" />
+  </svg>
+);
+
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const urlThreadId = threadIdFromPath(location.pathname);
+  // Temporary mode is driven by the `?temporary-chat=true` URL query param, so
+  // it survives refreshes and is shareable. A temp chat is never persisted.
+  const tempFromUrl = searchParams.get('temporary-chat') === 'true';
   const [currentThreadId, setCurrentThreadId] = useState(urlThreadId || null);
+  // Temporary chat mode: the conversation lives only in the current session and
+  // is never added to the persisted sidebar history. Initialized from the URL.
+  const [isTempChat, setIsTempChat] = useState(tempFromUrl);
   // Set right before navigating to a freshly created thread so useChat skips
   // its backend reload (the messages were just streamed into the UI).
   const skipLoadRef = useRef(false);
@@ -50,7 +108,10 @@ function App() {
 
   // Called when the backend creates a brand-new thread (first message in a
   // "New Chat"). Silently updates the URL without interrupting the user.
+  // In temporary-chat mode this is a no-op so the chat never becomes a
+  // persisted thread in the sidebar/history.
   const handleThreadCreated = (id) => {
+    if (isTempChat) return;
     skipLoadRef.current = true;
     setCurrentThreadId(id);
     navigate(`/chat/${id}`, { replace: true });
@@ -67,7 +128,7 @@ function App() {
     loadMessages,
     streamingProgress,
     stop,
-  } = useChat(currentThreadId, handleThreadCreated, skipLoadRef);
+  } = useChat(currentThreadId, handleThreadCreated, skipLoadRef, isTempChat);
 
   // Load document info when thread changes
   useEffect(() => {
@@ -92,13 +153,31 @@ function App() {
 
   const handleNewThread = () => {
     // New chat stays client-side until the first message is sent; the backend
-    // then creates the thread and the URL is updated silently.
+    // then creates the thread and the URL is updated silently. Clearing the
+    // temporary-chat query param exits temp mode.
     setCurrentThreadId(null);
+    setIsTempChat(false);
     setIsSidebarOpen(false);
     navigate('/chat');
   };
 
+  // Toggle temporary (session-only) chat mode. When On, the conversation is
+  // never persisted to the sidebar history; when Off, chats are saved normally.
+  // The toggle only appears on the New Chat screen, so we reset any active
+  // thread and return to a fresh new chat when toggling.
+  const toggleTempChat = () => {
+    setIsTempChat((prev) => {
+      const next = !prev;
+      setCurrentThreadId(null);
+      setIsSidebarOpen(false);
+      // Reflect temp mode in the URL so it survives refresh and is shareable.
+      navigate(next ? '/chat?temporary-chat=true' : '/chat');
+      return next;
+    });
+  };
+
   const handleThreadSelect = (threadId) => {
+    setIsTempChat(false);
     setCurrentThreadId(threadId);
     setIsSidebarOpen(false);
     navigate(`/chat/${threadId}`);
@@ -148,8 +227,9 @@ function App() {
 
   const handleSendMessage = async (message, tools = []) => {
     await sendMessage(message, tools);
-    // Refresh threads so a newly created chat (and updated titles) show in the sidebar
-    fetchThreads();
+    // Refresh threads so a newly created chat (and updated titles) show in the
+    // sidebar — skipped for temporary chats, which must not be persisted.
+    if (!isTempChat) fetchThreads();
   };
 
   const handleUploadPDF = async (file) => {
@@ -182,6 +262,11 @@ function App() {
     setIsSidebarCollapsed((c) => !c);
   };
 
+  // Keep temp mode in sync with the URL (refresh, back/forward, shared links).
+  useEffect(() => {
+    setIsTempChat(tempFromUrl);
+  }, [tempFromUrl]);
+
   return (
     <div className="flex h-screen bg-chat-bg text-white overflow-hidden">
       {/* Sidebar */}
@@ -203,9 +288,31 @@ function App() {
         {/* Chat Section */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <div className="flex-shrink-0 border-b border-gray-700 px-4 py-3 bg-chat-bg">
-            <div className="max-w-3xl mx-auto">
-              {/* Empty header or add logo/branding here if needed */}
+          <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
+            <div className="flex items-center justify-between">
+              <span className="text-base font-semibold tracking-tight text-white select-none">
+                OpenGPT
+              </span>
+              {/* Temporary chat toggle — only on the New Chat screen.
+                  Once a temp chat has messages, it can't be toggled off
+                  (start a new chat to leave temp mode). */}
+              {!currentThreadId && (
+                <button
+                  onClick={() => { if (messages.length === 0) toggleTempChat(); }}
+                  disabled={isTempChat && messages.length > 0}
+                  title={isTempChat && messages.length > 0 ? "This chat won't appear in your chat history" : 'Temporary chat'}
+                  className={`
+                    flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-sm font-medium transition-colors
+                    ${isTempChat
+                      ? 'text-yellow-200 hover:bg-gray-700/70'
+                      : 'text-gray-300 hover:text-white hover:bg-gray-700/70'}
+                    ${isTempChat && messages.length > 0 ? 'cursor-not-allowed' : ''}
+                  `}
+                >
+                  {isTempChat ? <TempChatCheckedIcon width={16} height={16} /> : <TempChatIcon width={16} height={16} />}
+                  {isTempChat && messages.length > 0 && <span>Temporary Chat</span>}
+                </button>
+              )}
             </div>
           </div>
 
@@ -217,6 +324,7 @@ function App() {
             streamingProgress={streamingProgress}
             onRegenerate={regenerate}
             onEditMessage={editMessage}
+            isTempChat={isTempChat}
           />
 
           {/* Input */}

@@ -159,22 +159,18 @@ const Sidebar = ({
         {isCollapsed ? (
           /* Collapsed rail (desktop) */
           <div className="flex flex-col items-center py-3 px-2">
-            {/* Brand + expand toggle row */}
-            <div className="flex items-center justify-between w-full gap-1 mb-2">
-              <span
-                title="OpenGPT"
-                className="flex items-center justify-center w-8 h-9 text-lg font-semibold text-white select-none"
-              >
-                O
-              </span>
-              <button
-                onClick={() => onToggleCollapse?.()}
-                title="Expand sidebar"
-                className="flex items-center justify-center w-8 h-8 rounded-xl hover:bg-gray-700 transition-colors"
-              >
-                <PanelLeftOpen size={18} />
-              </button>
-            </div>
+            {/* Brand — click the "O" to expand; hovering reveals the expand icon */}
+            <button
+              onClick={() => onToggleCollapse?.()}
+              title="OpenGPT — click to expand"
+              className="group/brand relative flex items-center justify-center w-9 h-9 mb-2 text-lg font-semibold text-white select-none rounded-xl hover:bg-gray-700 transition-colors"
+            >
+              <span className="group-hover/brand:opacity-0 transition-opacity">O</span>
+              <PanelLeftOpen
+                size={18}
+                className="absolute opacity-0 group-hover/brand:opacity-100 transition-opacity"
+              />
+            </button>
 
             <button
               onClick={onNewThread}

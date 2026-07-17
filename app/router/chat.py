@@ -86,36 +86,60 @@ async def edit_message(request: EditMessageRequest):
 async def chat_stream(
     message: str = Query(..., description="User message"),
     thread_id: Optional[str] = Query(None, description="Thread ID"),
-    tools: Optional[str] = Query(None, description="Comma-separated list of tools")
+    tools: Optional[str] = Query(None, description="Comma-separated list of tools"),
+    temporary: bool = Query(False, description="If true, chat is session-only (never persisted)")
 ):
     try:
         # Parse tools from comma-separated string
         tools_list = tools.split(',') if tools else None
-        
+
+        # Temporary chats never touch the database: use an in-memory graph with a
+        # throwaway id and skip thread creation / title generation entirely.
+        if temporary:
+            thread_id = "temp-session"
+
+            def generate_stream():
+                """Generator function for streaming responses"""
+                try:
+                    for chunk in ChatService.stream_message(message, thread_id, tools_list, temporary=True):
+                        # Send each chunk as JSON
+                        yield f"data: {json.dumps(chunk)}\n\n"
+
+                    # No thread_id is returned for temp chats so the frontend
+                    # keeps the conversation purely client-side.
+                    yield f"data: {json.dumps({'done': True})}\n\n"
+                except Exception as e:
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+            return StreamingResponse(
+                generate_stream(),
+                media_type="text/event-stream"
+            )
+
         # Create new thread if not provided
         if not thread_id:
             thread_id = ChatService.create_new_thread()
-        
+
         # Generate thread title from first message if needed
         ChatService.get_or_create_thread_title(thread_id, message)
-        
+
         def generate_stream():
             """Generator function for streaming responses"""
             try:
                 for chunk in ChatService.stream_message(message, thread_id, tools_list):
                     # Send each chunk as JSON
                     yield f"data: {json.dumps(chunk)}\n\n"
-                
+
                 # Send final message with thread_id
                 yield f"data: {json.dumps({'thread_id': thread_id, 'done': True})}\n\n"
             except Exception as e:
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
-        
+
         return StreamingResponse(
             generate_stream(),
             media_type="text/event-stream"
         )
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
