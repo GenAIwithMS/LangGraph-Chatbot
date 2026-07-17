@@ -1,5 +1,9 @@
 # OpenGPT
 
+<p align="center">
+  <img src="OpenGPT.png" alt="OpenGPT" width="5000" />
+</p>
+
 An AI chatbot built with LangGraph & RAG, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, temporary (session-only) chats, and persistent MySQL storage.
 
 ## Features
