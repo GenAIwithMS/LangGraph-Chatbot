@@ -50,6 +50,7 @@ A sophisticated chatbot implementation built using LangGraph, featuring a FastAP
 1. Make sure MySQL is installed and running
 2. Copy and configure environment variables:
 ```bash
+cd backend
 cp .env.example .env
 ```
 
@@ -84,6 +85,7 @@ This will start both the backend (port 8000) and frontend (port 3000) automatica
 
 **1. Start Backend:**
 ```bash
+cd backend
 python main.py
 ```
 
@@ -128,25 +130,26 @@ LANGCHAIN_API_KEY=your_langsmith_key
 
 ```
 .
-├── app/                      # FastAPI application
-│   ├── main.py              # FastAPI app initialization
-│   ├── router/              # API route handlers
-│   │   └── chat.py          # Chat, threads, RAG endpoints
-│   ├── schema/              # Pydantic models
-│   │   └── models.py        # Request/response schemas
-│   ├── services/            # Business logic
-│   │   ├── chatbot_service.py   # LangGraph chatbot
-│   │   ├── chat_service.py      # Chat operations
-│   │   ├── rag_service.py       # RAG/PDF processing
-│   │   └── thread_service.py    # Thread management
-│   └── tools/               # External API tools
-│       └── all_tools.py     # Search, weather, calc, stocks
-├── database/                # Database configuration
-│   ├── schema.sql          # MySQL schema
-│   ├── init_db.py          # Database initialization
-│   ├── config.py           # Database config
-│   ├── mysql_checkpoint.py # Custom MySQL checkpointer
-│   └── README.md           # Database setup guide
+├── backend/                 # FastAPI application
+│   ├── app/                 # Application package
+│   │   ├── main.py          # FastAPI app initialization
+│   │   ├── router/          # API route handlers
+│   │   │   └── chat.py      # Chat, threads, RAG endpoints
+│   │   ├── schema/          # Pydantic models
+│   │   │   └── models.py    # Request/response schemas
+│   │   ├── services/        # Business logic
+│   │   │   ├── chatbot.py   # LangGraph chatbot
+│   │   │   ├── chat.py      # Chat operations
+│   │   │   ├── rag.py       # RAG/document processing
+│   │   │   └── thread.py    # Thread management
+│   │   ├── database/        # Database configuration
+│   │   │   ├── init_db.py   # Database initialization
+│   │   │   ├── config.py    # Database config
+│   │   │   └── mysql_checkpoint.py # Custom MySQL checkpointer
+│   │   └── tools/           # External API tools
+│   │       └── (search, weather, calc, stocks, blogs)
+│   ├── main.py              # Backend entry point
+│   └── requirements.txt     # Python dependencies
 ├── frontend/                # React frontend
 │   ├── src/
 │   │   ├── components/      # React components
@@ -155,8 +158,6 @@ LANGCHAIN_API_KEY=your_langsmith_key
 │   │   └── App.jsx          # Main app
 │   ├── package.json
 │   └── vite.config.js
-├── main.py                  # Backend entry point
-├── requirements.txt         # Python dependencies
 ├── start.bat               # Windows startup script
 └── start.sh                # Linux/Mac startup script
 ```
@@ -208,6 +209,8 @@ LANGCHAIN_API_KEY=your_langsmith_key
 
 ### Backend Development
 ```bash
+cd backend
+
 # Install dependencies
 pip install -r requirements.txt
 
