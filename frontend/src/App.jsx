@@ -292,13 +292,13 @@ function App() {
                 <button
                   onClick={() => { if (messages.length === 0) toggleTempChat(); }}
                   disabled={isTempChat && messages.length > 0}
-                  title={isTempChat && messages.length > 0 ? 'Start a new chat to turn off Temporary Chat' : 'Temporary chat'}
+                  title={isTempChat && messages.length > 0 ? "This chat won't appear in your chat history" : 'Temporary chat'}
                   className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors
+                    flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-sm font-medium transition-colors
                     ${isTempChat
-                      ? 'bg-yellow-500/20 text-yellow-200'
+                      ? 'text-yellow-200 hover:bg-gray-700/70'
                       : 'text-gray-300 hover:text-white hover:bg-gray-700/70'}
-                    ${isTempChat && messages.length > 0 ? 'cursor-not-allowed opacity-90' : ''}
+                    ${isTempChat && messages.length > 0 ? 'cursor-not-allowed' : ''}
                   `}
                 >
                   {isTempChat ? <TempChatCheckedIcon width={16} height={16} /> : <TempChatIcon width={16} height={16} />}
