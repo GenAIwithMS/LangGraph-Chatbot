@@ -20,7 +20,7 @@ from app.schema.models import (
     DocumentInfoResponse
 )
 from app.services.chat import ChatService
-from app.services.rag import ingest_pdf, retrieve_from_document, has_document, get_document_info
+from app.services.rag import ingest_document, retrieve_from_document, has_document, get_document_info, SUPPORTED_EXTENSIONS
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 
@@ -223,36 +223,40 @@ async def upload_pdf(
     thread_id: Optional[str] = Form(None)
 ):
     try:
-        # Validate file type
-        if not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Only PDF files are supported")
-        
+        # Validate file type (PDF, Markdown, or plain text)
+        ext = os.path.splitext(file.filename or "")[1].lower()
+        if ext not in SUPPORTED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{ext}'. Supported: {', '.join(SUPPORTED_EXTENSIONS)}"
+            )
+
         # Create new thread if not provided
         if not thread_id:
             thread_id = ChatService.create_new_thread()
-        
+
         # Read file bytes
         file_bytes = await file.read()
-        
+
         if not file_bytes:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
-        
-        # Process PDF using the existing rag_backend logic
-        result = ingest_pdf(
+
+        # Process the document using the existing rag_backend logic
+        result = ingest_document(
             file_bytes=file_bytes,
             thread_id=thread_id,
             filename=file.filename
         )
-        
+
         # Add thread_id to result
         result["thread_id"] = thread_id
-        
+
         return PDFUploadResponse(**result)
-    
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
 
 
 @chat_router.delete("/threads/{thread_id}")

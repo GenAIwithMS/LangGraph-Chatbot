@@ -31,7 +31,7 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
   const menuActions = [
     {
       key: "upload",
-      label: "Upload PDF",
+      label: "Upload Document",
       description: "Attach a document",
       icon: Paperclip,
       iconClass: "text-blue-400",
@@ -141,10 +141,13 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
   };
 
   const handleFileSelect = (file) => {
-    if (file && file.type === "application/pdf") {
+    const name = file?.name || "";
+    const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+    const supported = [".pdf", ".md", ".txt"];
+    if (file && (file.type === "application/pdf" || supported.includes(ext))) {
       onUploadPDF(file);
     } else {
-      alert("Please upload a PDF file");
+      alert("Please upload a PDF, Markdown (.md), or text (.txt) file");
     }
   };
 
@@ -153,10 +156,13 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const pdfFile = files.find((file) => file.type === "application/pdf");
+    const docFile = files.find((file) => {
+      const ext = (file.name || "").slice(file.name.lastIndexOf(".")).toLowerCase();
+      return [".pdf", ".md", ".txt"].includes(ext);
+    });
 
-    if (pdfFile) {
-      handleFileSelect(pdfFile);
+    if (docFile) {
+      handleFileSelect(docFile);
     }
   };
 
@@ -224,12 +230,16 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
             <span className="text-gray-200 truncate">
               {uploadingPDF ? "Processing document..." : documentInfo?.filename}
             </span>
-            {!uploadingPDF && <span className="text-xs text-gray-400">PDF</span>}
+            {!uploadingPDF && (
+              <span className="text-xs text-gray-400">
+                {documentInfo?.filename?.split(".").pop()?.toUpperCase() || "DOC"}
+              </span>
+            )}
           </div>
         )}
 
         <PromptInputTextarea
-          placeholder={isDragging ? "Drop PDF file here..." : "Send a message..."}
+          placeholder={isDragging ? "Drop document here..." : "Send a message..."}
           disabled={inputDisabled}
         />
 
@@ -362,7 +372,7 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,.md,.txt"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleFileSelect(file);
@@ -374,10 +384,10 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
 
       <div className="mt-1 text-xs text-center text-gray-500">
         {isDragging ? (
-          <span className="text-blue-400">Drop your PDF file here</span>
+          <span className="text-blue-400">Drop your document here</span>
         ) : (
           <span>
-            Press Enter to send, Shift+Enter for new line • Drag & drop PDF files to upload
+            Press Enter to send, Shift+Enter for new line • Drag & drop documents (PDF, MD, TXT) to upload
           </span>
         )}
       </div>

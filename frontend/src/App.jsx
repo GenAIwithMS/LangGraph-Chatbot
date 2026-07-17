@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
@@ -130,6 +130,35 @@ function App() {
     stop,
   } = useChat(currentThreadId, handleThreadCreated, skipLoadRef, isTempChat);
 
+  // Centered layout (welcome heading + input in the middle of the viewport)
+  // only when the conversation has no messages yet. Driven purely by message
+  // count so it resets on new/temp chat and matches a refresh of an existing chat.
+  const centered = messages.length === 0;
+
+  // Smoothly slide the input between the centered (empty) and bottom states by
+  // translating it up from the bottom. Only `transform` is animated so there is
+  // no layout shift or snap.
+  const chatSectionRef = useRef(null);
+  const inputBlockRef = useRef(null);
+  const [slideUp, setSlideUp] = useState(0);
+  const [inputHeight, setInputHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const block = inputBlockRef.current;
+    const section = chatSectionRef.current;
+    if (!block || !section) return;
+    // Measure the input block so the scroll area can reserve matching bottom
+    // space (keeping the last message visible above the absolute input).
+    setInputHeight(block.offsetHeight);
+    if (!centered) {
+      setSlideUp(0);
+      return;
+    }
+    const containerH = section.clientHeight;
+    const blockH = block.offsetHeight;
+    setSlideUp(Math.max(0, containerH / 2 - blockH / 2));
+  }, [centered, messages.length, isTempChat, chatLoading, documentInfo, uploadingPDF]);
+
   // Load document info when thread changes
   useEffect(() => {
     if (currentThreadId) {
@@ -233,21 +262,34 @@ function App() {
   };
 
   const handleUploadPDF = async (file) => {
-    if (!currentThreadId) {
-      alert('Please send a message first to start a chat.');
+    // Temporary chats are session-only and never touch storage, and the backend
+    // temp path ignores documents — so document upload is not supported there.
+    if (isTempChat) {
+      alert('Document upload is not available in Temporary Chat.');
       return;
     }
 
+    // A document can be attached before any message is sent: if there is no
+    // active thread yet, the upload endpoint creates one for us. We then adopt
+    // that thread id (and update the URL) so the conversation continues there.
+    const threadId = currentThreadId;
+
     try {
       setUploadingPDF(true);
-      const response = await chatService.uploadPDF(currentThreadId, file);
+      const response = await chatService.uploadPDF(threadId, file);
+
+      // Adopt the thread the backend created (or returned) so subsequent
+      // messages land in the same conversation as the document.
       if (response.thread_id && response.thread_id !== currentThreadId) {
+        skipLoadRef.current = true;
         setCurrentThreadId(response.thread_id);
+        if (!isTempChat) navigate(`/chat/${response.thread_id}`, { replace: true });
+        if (!isTempChat) fetchThreads();
       }
       await loadDocumentInfo();
     } catch (error) {
-      console.error('Error uploading PDF:', error);
-      alert('Failed to upload PDF. Please try again.');
+      console.error('Error uploading document:', error);
+      alert('Failed to upload document. Please try again.');
     } finally {
       setUploadingPDF(false);
     }
@@ -285,8 +327,8 @@ function App() {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex h-screen relative">
-        {/* Chat Section */}
-        <div className="flex-1 flex flex-col">
+          {/* Chat Section */}
+          <div ref={chatSectionRef} className="flex-1 flex flex-col relative">
           {/* Header */}
           <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
             <div className="flex items-center justify-between">
@@ -316,27 +358,67 @@ function App() {
             </div>
           </div>
 
-          {/* Messages */}
-          <MessageList
-            messages={messages}
-            loading={chatLoading}
-            streaming={streamingProgress?.isStreaming}
-            streamingProgress={streamingProgress}
-            onRegenerate={regenerate}
-            onEditMessage={editMessage}
-            isTempChat={isTempChat}
-          />
+          {/* Messages — scrolling area. Collapses to height 0 while centered so
+              the input can occupy the full viewport; present otherwise. When not
+              centered it reserves bottom space for the absolute input so the
+              last message stays fully visible (no overlap / broken scroll). */}
+          <div
+            className={`flex-1 min-h-0 ${centered ? 'h-0 overflow-hidden' : 'block overflow-y-auto'}`}
+            style={{ paddingBottom: centered ? 0 : inputHeight }}
+          >
+            <MessageList
+              messages={messages}
+              loading={chatLoading}
+              streaming={streamingProgress?.isStreaming}
+              streamingProgress={streamingProgress}
+              onRegenerate={regenerate}
+              onEditMessage={editMessage}
+            />
+          </div>
 
-          {/* Input */}
-          <MessageInput
-            onSendMessage={handleSendMessage}
-            onUploadPDF={handleUploadPDF}
-            onStop={stop}
-            disabled={chatLoading || uploadingPDF}
-            hasDocument={documentInfo?.has_document}
-            documentInfo={documentInfo}
-            uploadingPDF={uploadingPDF}
-          />
+          {/* Input — single instance. Anchored to the bottom and slid upward
+              (translateY) to center it when the conversation is empty. Because
+              only `transform` animates, the move is smooth with no layout shift.
+              `centered` is driven purely by message count, so it resets on
+              new/temp chat and matches a refresh (existing chats load messages
+              -> bottom; empty chats -> centered). */}
+          <div
+            ref={inputBlockRef}
+            className="absolute inset-x-0 bottom-0 z-20 px-4 pb-4 transition-transform duration-300 ease-out"
+            style={{ transform: centered ? `translateY(-${slideUp}px)` : 'translateY(0)' }}
+          >
+            {/* Welcome heading — only above a centered, empty conversation */}
+            <div
+              className={`
+                w-full max-w-3xl mx-auto text-center mb-6
+                transition-all duration-200
+                ${centered ? 'opacity-100 mb-6' : 'opacity-0 h-0 mb-0 overflow-hidden pointer-events-none'}
+              `}
+            >
+              {isTempChat ? (
+                <>
+                  <h1 className="text-2xl font-bold text-gray-100">Temporary Chat</h1>
+                  <p className="mt-2 text-sm text-gray-400 max-w-md mx-auto">
+                    This chat won't appear in history or be used to train our models
+                  </p>
+                </>
+              ) : (
+                <h1 className="text-2xl font-bold text-gray-100">How can I help you today?</h1>
+              )}
+            </div>
+
+            <div className="w-full max-w-3xl mx-auto">
+              <MessageInput
+                onSendMessage={handleSendMessage}
+                onUploadPDF={handleUploadPDF}
+                onStop={stop}
+                disabled={chatLoading || uploadingPDF}
+                hasDocument={documentInfo?.has_document}
+                documentInfo={documentInfo}
+                uploadingPDF={uploadingPDF}
+              />
+            </div>
+          </div>
 
           {/* Error Display */}
           {(threadsError || chatError) && (

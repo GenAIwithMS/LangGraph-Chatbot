@@ -1,10 +1,13 @@
 import json
 import os
-from typing import Dict, Any, Optional
-from langchain_community.document_loaders import PyPDFLoader
+from typing import Dict, Any, Optional, Tuple
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
+
+# Document types supported for upload (RAG context).
+SUPPORTED_EXTENSIONS = (".pdf", ".md", ".txt")
 
 # Initialize HuggingFace embeddings
 try:
@@ -21,10 +24,15 @@ _STORAGE_DIR = os.path.join(os.path.dirname(__file__), "..", "storage", "documen
 os.makedirs(_STORAGE_DIR, exist_ok=True)
 
 
-def _thread_paths(thread_id: str) -> tuple[str, str]:
-    pdf_path = os.path.join(_STORAGE_DIR, f"{thread_id}.pdf")
+def _thread_paths(thread_id: str, ext: str = ".pdf") -> Tuple[str, str]:
+    doc_path = os.path.join(_STORAGE_DIR, f"{thread_id}{ext}")
     meta_path = os.path.join(_STORAGE_DIR, f"{thread_id}.json")
-    return pdf_path, meta_path
+    return doc_path, meta_path
+
+
+def _ext_for(filename: str) -> str:
+    """Return the lowercase extension (with dot) for a filename, or '' if none."""
+    return os.path.splitext(filename or "")[1].lower()
 
 
 def _write_metadata(thread_id: str, metadata: dict) -> None:
@@ -45,9 +53,18 @@ def _read_metadata(thread_id: str) -> Optional[dict]:
         return None
 
 
-def _build_retriever_from_pdf(pdf_path: str, embeddings: Any) -> Any:
-    loader = PyPDFLoader(pdf_path)
-    docs = loader.load()
+def _load_document(doc_path: str, ext: str):
+    """Load a document into LangChain Documents based on its extension."""
+    if ext == ".pdf":
+        loader = PyPDFLoader(doc_path)
+    else:
+        # .txt and .md are plain text
+        loader = TextLoader(doc_path, encoding="utf-8")
+    return loader.load()
+
+
+def _build_retriever_from_file(doc_path: str, embeddings: Any, ext: str) -> Tuple[Any, int, int]:
+    docs = _load_document(doc_path, ext)
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -74,13 +91,14 @@ def _get_retriever(thread_id: Optional[str]):
     metadata = _THREAD_METADATA.get(thread_key) or _read_metadata(thread_key)
     if metadata:
         _THREAD_METADATA[thread_key] = metadata
-        pdf_path = metadata.get("file_path")
-        if pdf_path and os.path.exists(pdf_path):
+        file_path = metadata.get("file_path")
+        ext = metadata.get("ext") or _ext_for(file_path or "")
+        if file_path and os.path.exists(file_path):
             if _DEFAULT_EMBEDDINGS is None:
                 print("[DEBUG RAG] Embeddings not available to rebuild retriever")
                 return None
             try:
-                retriever, docs_count, chunks_count = _build_retriever_from_pdf(pdf_path, _DEFAULT_EMBEDDINGS)
+                retriever, docs_count, chunks_count = _build_retriever_from_file(file_path, _DEFAULT_EMBEDDINGS, ext)
                 _THREAD_RETRIEVERS[thread_key] = retriever
                 metadata.update({
                     "documents": docs_count,
@@ -99,31 +117,35 @@ def _get_retriever(thread_id: Optional[str]):
     return None
 
 
-def ingest_pdf(file_bytes: bytes, thread_id: str, filename: Optional[str] = None, embeddings: Optional[Any] = None) -> dict:
+def ingest_document(file_bytes: bytes, thread_id: str, filename: Optional[str] = None, embeddings: Optional[Any] = None) -> dict:
     """
-    Build a FAISS retriever for the uploaded PDF and store it for the thread.
-
-    Returns a summary dict that can be surfaced in the UI.
+    Build a FAISS retriever for an uploaded document (.pdf, .md, .txt) and store
+    it for the thread. Returns a summary dict surfaced in the UI.
     """
     if embeddings is None:
         embeddings = _DEFAULT_EMBEDDINGS
 
     if embeddings is None:
         raise ValueError(
-            "No embeddings available. Provide an `embeddings` instance to `ingest_pdf` or install/configure HuggingFaceEmbeddings."
+            "No embeddings available. Provide an `embeddings` instance to `ingest_document` or install/configure HuggingFaceEmbeddings."
         )
 
-    pdf_path, _ = _thread_paths(str(thread_id))
-    with open(pdf_path, "wb") as handle:
+    ext = _ext_for(filename) or ".pdf"
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise ValueError(f"Unsupported file type '{ext}'. Supported: {', '.join(SUPPORTED_EXTENSIONS)}")
+
+    doc_path, _ = _thread_paths(str(thread_id), ext)
+    with open(doc_path, "wb") as handle:
         handle.write(file_bytes)
 
-    retriever, docs_count, chunks_count = _build_retriever_from_pdf(pdf_path, embeddings)
+    retriever, docs_count, chunks_count = _build_retriever_from_file(doc_path, embeddings, ext)
 
     metadata = {
-        "filename": filename or os.path.basename(pdf_path),
+        "filename": filename or os.path.basename(doc_path),
         "documents": docs_count,
         "chunks": chunks_count,
-        "file_path": pdf_path,
+        "file_path": doc_path,
+        "ext": ext,
     }
 
     _THREAD_RETRIEVERS[str(thread_id)] = retriever
@@ -135,6 +157,10 @@ def ingest_pdf(file_bytes: bytes, thread_id: str, filename: Optional[str] = None
         "documents": metadata["documents"],
         "chunks": metadata["chunks"],
     }
+
+
+# Backwards-compatible alias for the old PDF-only API.
+ingest_pdf = ingest_document
 
 
 def retrieve_from_document(query: str, thread_id: str) -> dict:
@@ -152,7 +178,7 @@ def retrieve_from_document(query: str, thread_id: str) -> dict:
                 "query": query,
             }
         return {
-            "error": "No document indexed for this chat. Upload a PDF first.",
+            "error": "No document indexed for this chat. Upload a document first.",
             "query": query,
         }
 

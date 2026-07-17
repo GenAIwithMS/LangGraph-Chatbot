@@ -592,12 +592,19 @@ class ChatService:
             
             session.commit()
             
-            # Clean up storage files (PDF and metadata JSON)
+            # Clean up storage files (uploaded document + metadata JSON). The
+            # document path lives in the thread's RAG metadata (extension may
+            # vary: .pdf/.md/.txt), so read it from there.
             try:
-                pdf_path, meta_path = _thread_paths(thread_id)
-                if os.path.exists(pdf_path):
-                    os.remove(pdf_path)
-                    print(f"Deleted PDF file: {pdf_path}")
+                from app.services.rag import _read_metadata
+                meta_path = os.path.join(
+                    os.path.dirname(__file__), "..", "storage", "documents", f"{thread_id}.json"
+                )
+                meta = _read_metadata(thread_id) or {}
+                doc_path = meta.get("file_path")
+                if doc_path and os.path.exists(doc_path):
+                    os.remove(doc_path)
+                    print(f"Deleted document file: {doc_path}")
                 if os.path.exists(meta_path):
                     os.remove(meta_path)
                     print(f"Deleted metadata file: {meta_path}")
