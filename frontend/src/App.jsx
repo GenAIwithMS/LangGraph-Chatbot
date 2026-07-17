@@ -141,16 +141,23 @@ function App() {
   const chatSectionRef = useRef(null);
   const inputBlockRef = useRef(null);
   const [slideUp, setSlideUp] = useState(0);
+  const [inputHeight, setInputHeight] = useState(0);
 
   useLayoutEffect(() => {
-    if (!centered || !chatSectionRef.current || !inputBlockRef.current) {
+    const block = inputBlockRef.current;
+    const section = chatSectionRef.current;
+    if (!block || !section) return;
+    // Measure the input block so the scroll area can reserve matching bottom
+    // space (keeping the last message visible above the absolute input).
+    setInputHeight(block.offsetHeight);
+    if (!centered) {
       setSlideUp(0);
       return;
     }
-    const containerH = chatSectionRef.current.clientHeight;
-    const blockH = inputBlockRef.current.offsetHeight;
+    const containerH = section.clientHeight;
+    const blockH = block.offsetHeight;
     setSlideUp(Math.max(0, containerH / 2 - blockH / 2));
-  }, [centered, messages.length, isTempChat, chatLoading, documentInfo]);
+  }, [centered, messages.length, isTempChat, chatLoading, documentInfo, uploadingPDF]);
 
   // Load document info when thread changes
   useEffect(() => {
@@ -255,21 +262,34 @@ function App() {
   };
 
   const handleUploadPDF = async (file) => {
-    if (!currentThreadId) {
-      alert('Please send a message first to start a chat.');
+    // Temporary chats are session-only and never touch storage, and the backend
+    // temp path ignores documents — so document upload is not supported there.
+    if (isTempChat) {
+      alert('Document upload is not available in Temporary Chat.');
       return;
     }
 
+    // A document can be attached before any message is sent: if there is no
+    // active thread yet, the upload endpoint creates one for us. We then adopt
+    // that thread id (and update the URL) so the conversation continues there.
+    const threadId = currentThreadId;
+
     try {
       setUploadingPDF(true);
-      const response = await chatService.uploadPDF(currentThreadId, file);
+      const response = await chatService.uploadPDF(threadId, file);
+
+      // Adopt the thread the backend created (or returned) so subsequent
+      // messages land in the same conversation as the document.
       if (response.thread_id && response.thread_id !== currentThreadId) {
+        skipLoadRef.current = true;
         setCurrentThreadId(response.thread_id);
+        if (!isTempChat) navigate(`/chat/${response.thread_id}`, { replace: true });
+        if (!isTempChat) fetchThreads();
       }
       await loadDocumentInfo();
     } catch (error) {
-      console.error('Error uploading PDF:', error);
-      alert('Failed to upload PDF. Please try again.');
+      console.error('Error uploading document:', error);
+      alert('Failed to upload document. Please try again.');
     } finally {
       setUploadingPDF(false);
     }
@@ -339,8 +359,13 @@ function App() {
           </div>
 
           {/* Messages — scrolling area. Collapses to height 0 while centered so
-              the input can occupy the full viewport; present otherwise. */}
-          <div className={`flex-1 min-h-0 ${centered ? 'h-0 overflow-hidden' : 'block'}`}>
+              the input can occupy the full viewport; present otherwise. When not
+              centered it reserves bottom space for the absolute input so the
+              last message stays fully visible (no overlap / broken scroll). */}
+          <div
+            className={`flex-1 min-h-0 ${centered ? 'h-0 overflow-hidden' : 'block overflow-y-auto'}`}
+            style={{ paddingBottom: centered ? 0 : inputHeight }}
+          >
             <MessageList
               messages={messages}
               loading={chatLoading}
