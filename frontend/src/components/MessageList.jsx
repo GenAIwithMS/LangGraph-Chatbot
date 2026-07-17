@@ -204,7 +204,7 @@ const markdownComponents = {
   br: () => <br />,
 };
 
-const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage }) => {
+const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage, isTempChat = false }) => {
   const messagesEndRef = useRef(null);
   const previousLengthRef = useRef(0);
   const [editIndex, setEditIndex] = useState(null);
@@ -385,8 +385,17 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
     <div className="flex-1 overflow-y-auto">
       {messages.length === 0 && !loading && (
         <div className="h-full flex items-center justify-center text-gray-400">
-          <div className="text-center">
-            <p className="text-xl font-medium">How can I help you today?</p>
+          <div className="text-center px-4">
+            {isTempChat ? (
+              <>
+                <h1 className="text-2xl font-bold text-gray-100">Temporary Chat</h1>
+                <p className="mt-2 text-sm text-gray-400 max-w-md">
+                  This chat won't appear in history or be used to train our models
+                </p>
+              </>
+            ) : (
+              <p className="text-xl font-medium">How can I help you today?</p>
+            )}
           </div>
         </div>
       )}

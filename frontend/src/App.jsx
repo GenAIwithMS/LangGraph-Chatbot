@@ -103,12 +103,20 @@ function App() {
     navigate('/chat');
   };
 
-  // Start a temporary (session-only) chat: not persisted to the sidebar history.
-  const handleStartTempChat = () => {
-    setIsTempChat(true);
-    setCurrentThreadId(null);
-    setIsSidebarOpen(false);
-    navigate('/chat');
+  // Toggle temporary (session-only) chat mode. When On, the conversation is
+  // never persisted to the sidebar history; when Off, chats are saved normally.
+  // The toggle only appears on the New Chat screen, so we reset any active
+  // thread and return to a fresh new chat when toggling.
+  const toggleTempChat = () => {
+    setIsTempChat((prev) => {
+      const next = !prev;
+      if (next) {
+        setCurrentThreadId(null);
+        setIsSidebarOpen(false);
+        navigate('/chat');
+      }
+      return next;
+    });
   };
 
   const handleThreadSelect = (threadId) => {
@@ -224,29 +232,25 @@ function App() {
           {/* Header */}
           <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-base font-semibold tracking-tight text-white select-none">
-                  OpenGPT
-                </span>
-                {isTempChat && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-300 text-[11px] font-medium">
-                    Temporary
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={handleStartTempChat}
-                title="Start a temporary chat (not saved)"
-                className={`
-                  flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors
-                  ${isTempChat
-                    ? 'bg-yellow-500/20 text-yellow-200'
-                    : 'text-gray-300 hover:text-white hover:bg-gray-700/70'}
-                `}
-              >
-                <MessageSquare size={16} />
-                <span>Temp chat</span>
-              </button>
+              <span className="text-base font-semibold tracking-tight text-white select-none">
+                OpenGPT
+              </span>
+              {/* Temporary chat toggle — only on the New Chat screen */}
+              {!currentThreadId && (
+                <button
+                  onClick={toggleTempChat}
+                  title="Temporary chat"
+                  className={`
+                    flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors
+                    ${isTempChat
+                      ? 'bg-yellow-500/20 text-yellow-200'
+                      : 'text-gray-300 hover:text-white hover:bg-gray-700/70'}
+                  `}
+                >
+                  <MessageSquare size={16} />
+                  {isTempChat && <span>Temporary Chat</span>}
+                </button>
+              )}
             </div>
           </div>
 
@@ -258,6 +262,7 @@ function App() {
             streamingProgress={streamingProgress}
             onRegenerate={regenerate}
             onEditMessage={editMessage}
+            isTempChat={isTempChat}
           />
 
           {/* Input */}
