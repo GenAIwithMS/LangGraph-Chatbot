@@ -3,6 +3,7 @@ from datetime import datetime, date
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, RemoveMessage
 from app.services.chatbot import (
     chatbot,
+    chatbot_memory,
     retrieve_all_threads,
     save_thread_title,
     get_thread_title_from_db,
@@ -270,12 +271,16 @@ class ChatService:
             raise Exception(f"Failed to regenerate message: {str(e)}")
 
     @staticmethod
-    def _stream_chatbot(config, doc_exists: bool, human_message):
+    def _stream_chatbot(graph, config, doc_exists: bool, human_message, temporary: bool = False):
         """Yield live-thinking/ai chunks while running the chatbot graph.
 
         When ``human_message`` is provided it is sent as a new turn; when it is
         ``None`` the graph continues from the current checkpoint (used for
         edit/regenerate so no duplicate user message is appended).
+
+        ``graph`` is the compiled chatbot (``chatbot`` for persisted chats or
+        ``chatbot_memory`` for temporary, session-only chats). When ``temporary``
+        is True nothing is persisted back to the database.
         """
         yield {"content": "Thinking...", "message_type": "thinking"}
 
@@ -291,7 +296,7 @@ class ChatService:
         answer_parts = []
         reasoning_parts = []
 
-        for message_chunk, metadata in chatbot.stream(
+        for message_chunk, metadata in graph.stream(
             {
                 "messages": input_messages,
                 "has_document": doc_exists,
@@ -337,7 +342,10 @@ class ChatService:
         # leaves the stored AIMessage empty for this model, so write it back
         # explicitly: drop the trailing (empty) assistant message and append one
         # with the real content. The answer lives in ``content``; only fall back
-        # to reasoning when the model emitted no final answer.
+        # to reasoning when the model emitted no final answer. Temporary chats
+        # are never persisted — they live only in the in-memory graph.
+        if temporary:
+            return
         persist_text = "".join(answer_parts).strip() or "".join(reasoning_parts).strip()
         if persist_text:
             try:
@@ -354,23 +362,27 @@ class ChatService:
                 print(f"Error persisting final assistant message: {e}")
 
     @staticmethod
-    def stream_message(message: str, thread_id: str, tools: Optional[List[str]] = None):
+    def stream_message(message: str, thread_id: str, tools: Optional[List[str]] = None, temporary: bool = False):
+        # Temporary chats run on an in-memory checkpointer and never touch the
+        # database. Use the memory-backed graph so nothing is persisted.
+        graph = chatbot_memory if temporary else chatbot
+
         config = {
             "configurable": {"thread_id": thread_id},
             "metadata": {"thread_id": thread_id}
         }
-        
+
         try:
             # If blogs tool is requested, stream the blog generation process
             if tools and "blogs" in tools:
                 try:
                     from app.tools.blogs.graph import app as blog_app
-                    
+
                     blog_state = {
                         "topic": message,
                         "as_of": date.today().isoformat(),
                     }
-                    
+
                     for event in blog_app.stream(blog_state, stream_mode="updates"):
                         for node_name, node_output in event.items():
                             # Stream progress updates for different nodes
@@ -408,14 +420,15 @@ class ChatService:
                                         "message_type": "ai",
                                         "node": "final"
                                     }
-                    
+
                     # Update thread timestamp
-                    touch_thread(thread_id)
+                    if not temporary:
+                        touch_thread(thread_id)
                     return
                 except Exception as blog_error:
                     error_msg = str(blog_error)
                     print(f"Error streaming blog tool: {error_msg}")
-                    
+
                     # Provide user-friendly error messages
                     if "name resolution failed" in error_msg or "503" in error_msg:
                         yield {
@@ -428,12 +441,13 @@ class ChatService:
                             "message_type": "ai"
                         }
                     return
-            
-            # Check if thread has a document
-            doc_exists = has_document(thread_id)
+
+            # Check if thread has a document (skipped for temp chats — they
+            # cannot have uploaded PDFs and must not touch document storage).
+            doc_exists = False if temporary else has_document(thread_id)
 
             # Stream tokens from the chatbot graph (live thinking + AI output)
-            yield from ChatService._stream_chatbot(config, doc_exists, message)
+            yield from ChatService._stream_chatbot(graph, config, doc_exists, message, temporary)
         except Exception as e:
             print(f"Error streaming message: {e}")
             raise Exception(f"Failed to stream message: {str(e)}")
@@ -539,7 +553,7 @@ class ChatService:
                         }
                     return
 
-            yield from ChatService._stream_chatbot(config, doc_exists, None)
+            yield from ChatService._stream_chatbot(chatbot, config, doc_exists, None)
             touch_thread(thread_id)
         except Exception as e:
             print(f"Error editing message: {e}")

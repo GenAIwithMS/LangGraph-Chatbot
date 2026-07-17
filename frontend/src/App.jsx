@@ -80,6 +80,9 @@ function App() {
   // it survives refreshes and is shareable. A temp chat is never persisted.
   const tempFromUrl = searchParams.get('temporary-chat') === 'true';
   const [currentThreadId, setCurrentThreadId] = useState(urlThreadId || null);
+  // Temporary chat mode: the conversation lives only in the current session and
+  // is never added to the persisted sidebar history. Initialized from the URL.
+  const [isTempChat, setIsTempChat] = useState(tempFromUrl);
   // Set right before navigating to a freshly created thread so useChat skips
   // its backend reload (the messages were just streamed into the UI).
   const skipLoadRef = useRef(false);
@@ -125,7 +128,7 @@ function App() {
     loadMessages,
     streamingProgress,
     stop,
-  } = useChat(currentThreadId, handleThreadCreated, skipLoadRef);
+  } = useChat(currentThreadId, handleThreadCreated, skipLoadRef, isTempChat);
 
   // Load document info when thread changes
   useEffect(() => {
@@ -258,10 +261,6 @@ function App() {
   const toggleSidebarCollapse = () => {
     setIsSidebarCollapsed((c) => !c);
   };
-
-  // Temporary chat mode: the conversation lives only in the current session and
-  // is never added to the persisted sidebar history. Initialized from the URL.
-  const [isTempChat, setIsTempChat] = useState(tempFromUrl);
 
   // Keep temp mode in sync with the URL (refresh, back/forward, shared links).
   useEffect(() => {

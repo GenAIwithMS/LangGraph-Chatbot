@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { chatService } from '../services/api';
 
-export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
+export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = false) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -22,7 +22,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
     } else {
       setMessages([]);
     }
-  }, [threadId]);
+  }, [threadId, isTempChat]);
 
   const loadMessages = async () => {
     if (!threadId) return;
@@ -216,7 +216,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
           }
         };
 
-        eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleMessage, handleError);
+        eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleMessage, handleError, isTempChat);
         return;
       }
 
@@ -238,7 +238,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef) => {
         },
       ]);
 
-      eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleChatChunk, handleStreamError);
+      eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleChatChunk, handleStreamError, isTempChat);
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);

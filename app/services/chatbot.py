@@ -7,6 +7,7 @@ from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.checkpoint.memory import MemorySaver
 from app.tools import Search, Weather, Calculator, Stock_price
 from app.services.rag import has_document, retrieve_from_document
 from app.database import DatabaseConfig,MySQLCheckpointSaver,ThreadMetadata
@@ -98,6 +99,12 @@ check_pointer = MySQLCheckpointSaver()
 
 # Compile the chatbot with checkpointer
 chatbot = graph.compile(checkpointer=check_pointer)
+
+# In-memory checkpointer for temporary chats: nothing is ever written to the
+# database, so temp conversations only live in the running process and are lost
+# on refresh / new chat / backend restart.
+memory_checkpointer = MemorySaver()
+chatbot_memory = graph.compile(checkpointer=memory_checkpointer)
 
 # Database session factory
 Session = DatabaseConfig.get_session_factory()
