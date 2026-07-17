@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
@@ -74,7 +74,11 @@ const TempChatCheckedIcon = (props) => (
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const urlThreadId = threadIdFromPath(location.pathname);
+  // Temporary mode is driven by the `?temporary-chat=true` URL query param, so
+  // it survives refreshes and is shareable. A temp chat is never persisted.
+  const tempFromUrl = searchParams.get('temporary-chat') === 'true';
   const [currentThreadId, setCurrentThreadId] = useState(urlThreadId || null);
   // Set right before navigating to a freshly created thread so useChat skips
   // its backend reload (the messages were just streamed into the UI).
@@ -146,7 +150,8 @@ function App() {
 
   const handleNewThread = () => {
     // New chat stays client-side until the first message is sent; the backend
-    // then creates the thread and the URL is updated silently.
+    // then creates the thread and the URL is updated silently. Clearing the
+    // temporary-chat query param exits temp mode.
     setCurrentThreadId(null);
     setIsTempChat(false);
     setIsSidebarOpen(false);
@@ -160,11 +165,10 @@ function App() {
   const toggleTempChat = () => {
     setIsTempChat((prev) => {
       const next = !prev;
-      if (next) {
-        setCurrentThreadId(null);
-        setIsSidebarOpen(false);
-        navigate('/chat');
-      }
+      setCurrentThreadId(null);
+      setIsSidebarOpen(false);
+      // Reflect temp mode in the URL so it survives refresh and is shareable.
+      navigate(next ? '/chat?temporary-chat=true' : '/chat');
       return next;
     });
   };
@@ -256,8 +260,13 @@ function App() {
   };
 
   // Temporary chat mode: the conversation lives only in the current session and
-  // is never added to the persisted sidebar history.
-  const [isTempChat, setIsTempChat] = useState(false);
+  // is never added to the persisted sidebar history. Initialized from the URL.
+  const [isTempChat, setIsTempChat] = useState(tempFromUrl);
+
+  // Keep temp mode in sync with the URL (refresh, back/forward, shared links).
+  useEffect(() => {
+    setIsTempChat(tempFromUrl);
+  }, [tempFromUrl]);
 
   return (
     <div className="flex h-screen bg-chat-bg text-white overflow-hidden">
