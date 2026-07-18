@@ -150,6 +150,10 @@ class ChatService:
             
             messages = final_state["messages"]
             
+            print(f"[DEBUG] Total messages: {len(messages)}")
+            for i, m in enumerate(messages):
+                print(f"[DEBUG] msg[{i}] type={type(m).__name__} content={str(m.content)[:100]}")
+            
             # Update thread timestamp to show recent activity
             touch_thread(thread_id)
             

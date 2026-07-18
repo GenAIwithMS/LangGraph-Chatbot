@@ -10,7 +10,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
 from app.tools import Search, Weather, Calculator, Stock_price
 from app.services.rag import has_document, retrieve_from_document
-from app.database import DatabaseConfig,MySQLCheckpointSaver,ThreadMetadata
+from app.database import DatabaseConfig, SQLiteCheckpointSaver, ThreadMetadata
 import os
 
 load_dotenv()
@@ -95,7 +95,7 @@ graph.add_conditional_edges("chat_node", tools_condition)
 graph.add_edge("tools", "chat_node")
 
 # Database checkpointer
-check_pointer = MySQLCheckpointSaver()
+check_pointer = SQLiteCheckpointSaver()
 
 # Compile the chatbot with checkpointer
 chatbot = graph.compile(checkpointer=check_pointer)
