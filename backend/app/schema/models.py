@@ -47,6 +47,7 @@ class ThreadResponse(BaseModel):
 
     thread_id: str = Field(..., description="Unique thread identifier")
     title: str = Field(..., description="Thread title")
+    updated_at: Optional[str] = Field(None, description="Last updated timestamp (ISO format)")
 
 
 class ThreadListResponse(BaseModel):

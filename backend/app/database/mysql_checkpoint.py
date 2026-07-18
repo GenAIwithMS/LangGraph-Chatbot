@@ -9,17 +9,6 @@ from app.database.config import DatabaseConfig
 from app.database.models import Checkpoint as CheckpointModel, CheckpointWrite as CheckpointWriteModel
 
 
-# ---------------------------------------------------------------------------
-# Concurrency control
-# ---------------------------------------------------------------------------
-# LangGraph can execute nodes in parallel (and the app can receive rapid
-# concurrent requests on the same chat thread). The original implementation
-# did an unsynchronized read-modify-write on the same checkpoint row, which
-# produced Optimistic Concurrency Control collisions (MySQL "record has
-# changed since last read" / duplicate-key on the checkpoint PK) and lost
-# updates. We serialize every put/put_writes for a given thread_id so that
-# only one writer touches that thread's rows at a time, and retry transient
-# DB conflicts as a safety net.
 _thread_locks: dict[str, threading.RLock] = {}
 _thread_locks_guard = threading.Lock()
 
@@ -35,17 +24,12 @@ def _lock_for(thread_id: str) -> threading.RLock:
         return lock
 
 
-class MySQLCheckpointSaver(BaseCheckpointSaver):
-    """SQLAlchemy-based checkpoint saver for LangGraph"""
-
+class SQLiteCheckpointSaver(BaseCheckpointSaver):
     def __init__(self):
-        """Initialize MySQL checkpoint saver with SQLAlchemy"""
         super().__init__()
         self.session_factory = DatabaseConfig.get_session_factory()
 
     def _run(self, thread_id: str, fn):
-        """Run fn(session) with a fresh session, serialized per thread and
-        retried on transient DB conflicts."""
         lock = _lock_for(thread_id)
         last_exc = None
         for attempt in range(MAX_CONCURRENCY_RETRIES):
@@ -61,7 +45,6 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
                 except Exception:
                     pass
                 last_exc = e
-                # Briefly back off and retry the whole read-modify-write.
                 time.sleep(0.05 * (attempt + 1))
                 continue
             finally:
@@ -69,7 +52,6 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
         raise last_exc
 
     def put(self, config: dict, checkpoint: Checkpoint, metadata: dict, new_versions: dict) -> dict:
-        """Save a checkpoint to MySQL using SQLAlchemy"""
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = checkpoint["id"]
@@ -112,15 +94,11 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
         return self._run(thread_id, _op)
 
     def put_writes(self, config: dict, writes: list, task_id: str) -> None:
-        """Save checkpoint writes to MySQL using SQLAlchemy"""
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"]["checkpoint_id"]
 
         def _op(session):
-            # Ensure checkpoint exists before adding writes (to satisfy the
-            # foreign key constraint). LangGraph may call put_writes before
-            # put, so create a placeholder if needed.
             checkpoint_exists = session.query(CheckpointModel).filter_by(
                 thread_id=thread_id,
                 checkpoint_ns=checkpoint_ns,
@@ -147,7 +125,6 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
                 ))
                 session.flush()
 
-            # Use no_autoflush to prevent premature flush during queries.
             with session.no_autoflush:
                 for idx, (channel, value) in enumerate(writes):
                     value_blob = pickle.dumps(value)
@@ -178,7 +155,6 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
         self._run(thread_id, _op)
 
     def get_tuple(self, config: dict) -> Optional[CheckpointTuple]:
-        """Get a checkpoint tuple from MySQL using SQLAlchemy"""
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"].get("checkpoint_id")
@@ -218,14 +194,12 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
             session.close()
 
     def get(self, config: dict) -> Optional[Checkpoint]:
-        """Get a checkpoint from MySQL (convenience method)"""
         result = self.get_tuple(config)
         if result:
-            return result[1]  # Return just the checkpoint
+            return result.checkpoint
         return None
 
     def list(self, config: Optional[dict] = None) -> Iterator[CheckpointTuple]:
-        """List all checkpoints, optionally filtered by config"""
         session = self.session_factory()
         try:
             query = session.query(CheckpointModel)

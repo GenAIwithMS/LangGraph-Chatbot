@@ -4,9 +4,12 @@ import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ConfirmationModal from './components/ConfirmationModal';
+import AuthModal from './components/AuthModal';
+import { useAuth } from './context/AuthContext';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { chatService } from './services/api';
+import { LogOut, User as UserIcon } from 'lucide-react';
 
 // Derive the active thread id from the URL path:
 //   /                 -> new chat
@@ -72,6 +75,8 @@ const TempChatCheckedIcon = (props) => (
 );
 
 function App() {
+  const { user, loading: authLoading, logout } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -99,6 +104,12 @@ function App() {
     fetchThreads,
     updateThreadTitle,
   } = useThreads();
+
+  useEffect(() => {
+    if (!authLoading) {
+      setShowAuthModal(!user);
+    }
+  }, [authLoading, user]);
 
   // Keep the active thread in sync with the URL (deep links, back/forward).
   useEffect(() => {
@@ -255,15 +266,19 @@ function App() {
   };
 
   const handleSendMessage = async (message, tools = []) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     await sendMessage(message, tools);
-    // Refresh threads so a newly created chat (and updated titles) show in the
-    // sidebar — skipped for temporary chats, which must not be persisted.
     if (!isTempChat) fetchThreads();
   };
 
   const handleUploadPDF = async (file) => {
-    // Temporary chats are session-only and never touch storage, and the backend
-    // temp path ignores documents — so document upload is not supported there.
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     if (isTempChat) {
       alert('Document upload is not available in Temporary Chat.');
       return;
@@ -332,10 +347,22 @@ function App() {
           {/* Header */}
           <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
             <div className="flex items-center justify-between">
-              <span className="text-base font-semibold tracking-tight text-white select-none">
-                OpenGPT
-              </span>
-              {/* Temporary chat toggle — only on the New Chat screen.
+                <span className="text-base font-semibold tracking-tight text-white select-none">
+                  OpenGPT
+                </span>
+                <div className="flex items-center gap-2">
+                {user && (
+                  <button
+                    onClick={logout}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-sm text-gray-300 hover:text-white hover:bg-gray-700/70 transition-colors"
+                    title={`Logged in as ${user.username}`}
+                  >
+                    <span className="hidden sm:inline text-xs">{user.username}</span>
+                    <LogOut size={14} />
+                  </button>
+                )}
+                </div>
+                {/* Temporary chat toggle — only on the New Chat screen.
                   Once a temp chat has messages, it can't be toggled off
                   (start a new chat to leave temp mode). */}
               {!currentThreadId && (
@@ -428,6 +455,12 @@ function App() {
           )}
         </div>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        open={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
