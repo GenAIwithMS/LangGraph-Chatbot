@@ -9,6 +9,8 @@ const api = axios.create({
   },
 });
 
+export default api;
+
 export const chatService = {
   // Send a message to the chatbot
   sendMessage: async (threadId, message, tools = []) => {
@@ -33,11 +35,11 @@ export const chatService = {
   streamMessage: (threadId, message, tools = [], onMessage, onError, temporary = false) => {
     const params = new URLSearchParams();
     params.set('message', message);
-    // Omit thread_id for a brand-new ("New Chat") conversation so the backend
-    // creates the thread and returns its id in the final `done` event.
     if (threadId) params.set('thread_id', threadId);
     if (tools.length > 0) params.set('tools', tools.join(','));
     if (temporary) params.set('temporary', 'true');
+    const token = localStorage.getItem('token');
+    if (token) params.set('token', token);
     const eventSource = new EventSource(
       `${API_BASE_URL}/chat/stream?${params.toString()}`
     );
@@ -83,9 +85,12 @@ export const chatService = {
       tools: tools.length > 0 ? tools : undefined,
     };
 
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     fetch(`${API_BASE_URL}/chat/edit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     })
       .then((response) => {

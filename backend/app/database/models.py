@@ -1,15 +1,25 @@
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, Text, LargeBinary, ForeignKeyConstraint, Index
+from sqlalchemy import Column, String, Integer, DateTime, Text, LargeBinary, ForeignKey, ForeignKeyConstraint, Index
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
 Base = declarative_base()
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(100), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=func.current_timestamp())
+
+
 class ThreadMetadata(Base):
     __tablename__ = "thread_metadata"
 
     thread_id = Column(String(255), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(255), nullable=False, default="New Chat")
     created_at = Column(DateTime, default=func.current_timestamp())
     updated_at = Column(DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp())

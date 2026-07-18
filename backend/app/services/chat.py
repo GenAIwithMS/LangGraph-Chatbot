@@ -14,28 +14,24 @@ from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
 
 class ChatService:
-    """Service class to handle chat-related business logic"""
     
     @staticmethod
-    def create_new_thread() -> str:
-        """Create a new thread and return its ID"""
+    def create_new_thread(user_id: int = 0) -> str:
         thread_id = generate_thread_id()
-        save_thread_title(thread_id, "New Chat")
+        save_thread_title(thread_id, "New Chat", user_id)
         return thread_id
     
     @staticmethod
-    def get_or_create_thread_title(thread_id: str, user_message: Optional[str] = None) -> str:
+    def get_or_create_thread_title(thread_id: str, user_message: Optional[str] = None, user_id: int = 0) -> str:
         db_title = get_thread_title_from_db(thread_id)
         
-        # If title is "New Chat" (default), generate a new one from the message
         if db_title and db_title != "New Chat":
             return db_title
         
-        # Generate new title from user message
         if user_message:
             try:
                 title = generate_id_name(user_message)
-                save_thread_title(thread_id, title)
+                save_thread_title(thread_id, title, user_id)
                 return title
             except Exception as e:
                 print(f"Error generating title: {e}")
@@ -44,9 +40,9 @@ class ChatService:
         return str(thread_id)[:8] + "..."
     
     @staticmethod
-    def get_all_threads() -> List[Dict[str, str]]:
+    def get_all_threads(user_id: int = 0) -> List[Dict[str, str]]:
         thread_ids = retrieve_all_threads()
-        metadata = get_all_thread_metadata()
+        metadata = get_all_thread_metadata(user_id)
         
         threads = []
         for tid in thread_ids:
@@ -149,10 +145,6 @@ class ChatService:
             )
             
             messages = final_state["messages"]
-            
-            print(f"[DEBUG] Total messages: {len(messages)}")
-            for i, m in enumerate(messages):
-                print(f"[DEBUG] msg[{i}] type={type(m).__name__} content={str(m.content)[:100]}")
             
             # Update thread timestamp to show recent activity
             touch_thread(thread_id)
