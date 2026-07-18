@@ -139,7 +139,11 @@ async def get_threads(user: User = Depends(get_current_user)):
         threads = ChatService.get_all_threads(user.id)
 
         thread_responses = [
-            ThreadResponse(thread_id=t["thread_id"], title=t["title"])
+            ThreadResponse(
+                thread_id=t["thread_id"],
+                title=t["title"],
+                updated_at=t["updated_at"].isoformat() + "Z" if t.get("updated_at") else None
+            )
             for t in threads
         ]
 

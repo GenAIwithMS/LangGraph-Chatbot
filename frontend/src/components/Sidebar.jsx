@@ -11,6 +11,20 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 
+function formatTime(isoString) {
+  const date = new Date(isoString);
+  const now = new Date();
+  const opts = { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' };
+  const time = date.toLocaleTimeString('en-PK', opts);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return time;
+  if (date.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`;
+  return date.toLocaleDateString('en-PK', { day: 'numeric', month: 'short' }) + ' ' + time;
+}
+
 const Sidebar = ({
   threads,
   currentThreadId,
@@ -299,9 +313,16 @@ const Sidebar = ({
                         />
                       ) : (
                         <>
-                          <span className="text-sm text-gray-100 truncate flex-1 min-w-0">
-                            {thread.title || 'New Chat'}
-                          </span>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-gray-100 truncate block">
+                              {thread.title || 'New Chat'}
+                            </span>
+                            {thread.updated_at && (
+                              <span className="text-[10px] text-gray-500 mt-0.5 block">
+                                {formatTime(thread.updated_at)}
+                              </span>
+                            )}
+                          </div>
                           <button
                             onClick={(e) => toggleMenu(e, thread.thread_id)}
                             aria-label="Chat options"
