@@ -213,7 +213,7 @@ const Sidebar = ({
           /* Expanded sidebar */
           <>
             {/* Brand header */}
-            <div className="flex items-center justify-between px-2 pt-3 pb-1">
+            <div className="flex items-center justify-between px-2 pt-3 pb-1 shrink-0">
               <span className="px-2 text-base font-semibold tracking-tight text-white select-none whitespace-nowrap overflow-hidden">
                 OpenGPT
               </span>
@@ -276,33 +276,38 @@ const Sidebar = ({
               </div>
             </div>
 
-            {/* Recents header — toggles the chat history list visibility */}
-            <button
-              type="button"
-              onClick={() => setRecentsOpen((o) => !o)}
-              className="group flex items-center justify-between w-full px-3 pt-3 pb-1 text-left"
-            >
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 group-hover:text-gray-200 transition-colors">
-                Recents
-              </span>
-              <ChevronDown
-                size={16}
-                className={`
-                  text-gray-400 opacity-0 group-hover:opacity-100
-                  transition-transform duration-300 ease-out group-hover:text-gray-200
-                  ${recentsOpen ? 'rotate-0' : '-rotate-90'}
-                `}
-              />
-            </button>
+            {/* Scrollable middle: Recents header + chat history.
+                This region is the only flexible part; the OpenGPT header and
+                footer stay pinned (shrink-0) so collapsing Recents doesn't move
+                them. */}
+            <div className="flex-1 min-h-0 flex flex-col">
+              {/* Recents header — toggles the chat history list visibility */}
+              <button
+                type="button"
+                onClick={() => setRecentsOpen((o) => !o)}
+                className="group flex items-center gap-1 px-3 pt-3 pb-1 text-left shrink-0"
+              >
+                <span className="text-sm font-medium text-gray-300 group-hover:text-gray-100 transition-colors">
+                  Recents
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`
+                    text-gray-400 opacity-0 group-hover:opacity-100
+                    transition-transform duration-300 ease-out group-hover:text-gray-200
+                    ${recentsOpen ? 'rotate-0' : '-rotate-90'}
+                  `}
+                />
+              </button>
 
-            {/* Chat history */}
-            <div
-              className={`
-                flex-1 overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll
-                transition-[max-height,opacity] duration-300 ease-out
-                ${recentsOpen ? 'max-h-[60vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}
-              `}
-            >
+              {/* Chat history */}
+              <div
+                className={`
+                  overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll
+                  transition-[max-height,opacity] duration-300 ease-out
+                  ${recentsOpen ? 'max-h-[60vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}
+                `}
+              >
               {filteredThreads.length === 0 ? (
                 <div className="px-3 py-6 text-center text-xs text-gray-500">
                   {query ? 'No chats found' : 'No chats yet'}
@@ -394,9 +399,10 @@ const Sidebar = ({
                 })
               )}
             </div>
+            </div>
 
             {/* Footer */}
-            <div className="px-3 py-3 border-t border-gray-700/60">
+            <div className="px-3 py-3 border-t border-gray-700/60 shrink-0">
               <div className="text-xs text-gray-500 text-center">
                 OpenGPT
               </div>
