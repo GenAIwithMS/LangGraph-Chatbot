@@ -14,7 +14,15 @@ import {
 } from "lucide-react";
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from "./ui/prompt-input";
 
-const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocument, documentInfo, uploadingPDF }) => {
+const MessageInput = ({
+  onSendMessage,
+  onAddAttachment,
+  onRemoveAttachment,
+  onStop,
+  disabled,
+  pendingAttachments = [],
+  uploadingAttachment = false,
+}) => {
   const [message, setMessage] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -25,8 +33,8 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
   const menuRef = useRef(null);
   const menuItemsRef = useRef([]);
 
-  const inputDisabled = uploadingPDF;
-  const showStop = disabled && !uploadingPDF;
+  const inputDisabled = uploadingAttachment;
+  const showStop = disabled && !uploadingAttachment;
 
   const menuActions = [
     {
@@ -106,7 +114,7 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
 
   const handleSubmit = () => {
     if (message.trim() && !disabled) {
-      onSendMessage(message, selectedTools);
+      onSendMessage(message, selectedTools, pendingAttachments);
       setMessage("");
       setSelectedTools([]);
     }
@@ -145,7 +153,9 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
     const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
     const supported = [".pdf", ".md", ".txt"];
     if (file && (file.type === "application/pdf" || supported.includes(ext))) {
-      onUploadPDF(file);
+      // Hold the file as a pending attachment (ChatGPT-style chip). It is only
+      // uploaded when the message is actually sent, together with the prompt.
+      onAddAttachment(file);
     } else {
       alert("Please upload a PDF, Markdown (.md), or text (.txt) file");
     }
@@ -219,22 +229,33 @@ const MessageInput = ({ onSendMessage, onUploadPDF, onStop, disabled, hasDocumen
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        {/* Attachment Chip */}
-        {(uploadingPDF || (hasDocument && documentInfo)) && (
-          <div className="flex items-center gap-2 bg-[#1f2026] border border-gray-600 rounded-lg px-3 py-2 text-sm mx-1 mb-1">
-            {uploadingPDF ? (
-              <Loader2 size={16} className="animate-spin text-blue-400" />
-            ) : (
-              <FileText size={16} className="text-blue-400" />
-            )}
-            <span className="text-gray-200 truncate">
-              {uploadingPDF ? "Processing document..." : documentInfo?.filename}
-            </span>
-            {!uploadingPDF && (
-              <span className="text-xs text-gray-400">
-                {documentInfo?.filename?.split(".").pop()?.toUpperCase() || "DOC"}
-              </span>
-            )}
+        {/* Pending attachment chips (ChatGPT-style) — shown before sending */}
+        {pendingAttachments.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mx-1 mb-1">
+            {pendingAttachments.map((att) => {
+              const fname = att.file?.name || att.name || "document";
+              const ext = (fname.split(".").pop() || "doc").toUpperCase();
+              return (
+                <div
+                  key={att.id}
+                  className="flex items-center gap-2 bg-[#1f2026] border border-gray-600 rounded-lg pl-3 pr-2 py-2 text-sm max-w-[220px]"
+                >
+                  <FileText size={16} className="text-blue-400 shrink-0" />
+                  <span className="text-gray-200 truncate" title={fname}>
+                    {fname}
+                  </span>
+                  <span className="text-xs text-gray-400 shrink-0">{ext}</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveAttachment(att.id)}
+                    aria-label={`Remove ${fname}`}
+                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full text-gray-400 hover:text-gray-100 hover:bg-gray-700 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 

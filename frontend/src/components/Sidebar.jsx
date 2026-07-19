@@ -6,10 +6,30 @@ import {
   Menu,
   X,
   MoreVertical,
+  ChevronDown,
   Search as SearchIcon,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
+
+const SquarePenIcon = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="lucide lucide-square-pen-icon lucide-square-pen"
+    {...props}
+  >
+    <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
+  </svg>
+);
 
 const Sidebar = ({
   threads,
@@ -28,6 +48,7 @@ const Sidebar = ({
   const [openMenuId, setOpenMenuId] = useState(null);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [recentsOpen, setRecentsOpen] = useState(true);
   const searchInputRef = useRef(null);
 
   const filteredThreads = useMemo(() => {
@@ -192,7 +213,7 @@ const Sidebar = ({
           /* Expanded sidebar */
           <>
             {/* Brand header */}
-            <div className="flex items-center justify-between px-2 pt-3 pb-1">
+            <div className="flex items-center justify-between px-2 pt-3 pb-1 shrink-0">
               <span className="px-2 text-base font-semibold tracking-tight text-white select-none whitespace-nowrap overflow-hidden">
                 OpenGPT
               </span>
@@ -213,7 +234,7 @@ const Sidebar = ({
                 title="New chat"
               >
                 <span className="flex items-center justify-center w-5 h-5 shrink-0">
-                  <Plus size={18} />
+                  <SquarePenIcon size={18} />
                 </span>
                 <span className="text-sm font-medium whitespace-nowrap">New chat</span>
               </button>
@@ -255,8 +276,38 @@ const Sidebar = ({
               </div>
             </div>
 
-            {/* Chat history */}
-            <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll">
+            {/* Scrollable middle: Recents header + chat history.
+                This region is the only flexible part; the OpenGPT header and
+                footer stay pinned (shrink-0) so collapsing Recents doesn't move
+                them. */}
+            <div className="flex-1 min-h-0 flex flex-col">
+              {/* Recents header — toggles the chat history list visibility */}
+              <button
+                type="button"
+                onClick={() => setRecentsOpen((o) => !o)}
+                className="group flex items-center gap-1 px-3 pt-3 pb-1 text-left shrink-0"
+              >
+                <span className="text-sm font-medium text-gray-300 group-hover:text-gray-100 transition-colors">
+                  Recents
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`
+                    text-gray-400 opacity-0 group-hover:opacity-100
+                    transition-transform duration-300 ease-out group-hover:text-gray-200
+                    ${recentsOpen ? 'rotate-0' : '-rotate-90'}
+                  `}
+                />
+              </button>
+
+              {/* Chat history */}
+              <div
+                className={`
+                  overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll
+                  transition-[max-height,opacity] duration-300 ease-out
+                  ${recentsOpen ? 'max-h-[60vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}
+                `}
+              >
               {filteredThreads.length === 0 ? (
                 <div className="px-3 py-6 text-center text-xs text-gray-500">
                   {query ? 'No chats found' : 'No chats yet'}
@@ -348,9 +399,10 @@ const Sidebar = ({
                 })
               )}
             </div>
+            </div>
 
             {/* Footer */}
-            <div className="px-3 py-3 border-t border-gray-700/60">
+            <div className="px-3 py-3 border-t border-gray-700/60 shrink-0">
               <div className="text-xs text-gray-500 text-center">
                 OpenGPT
               </div>

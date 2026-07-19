@@ -87,8 +87,8 @@ function App() {
   // its backend reload (the messages were just streamed into the UI).
   const skipLoadRef = useRef(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [documentInfo, setDocumentInfo] = useState(null);
-  const [uploadingPDF, setUploadingPDF] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [threadToDelete, setThreadToDelete] = useState(null);
 
@@ -157,28 +157,7 @@ function App() {
     const containerH = section.clientHeight;
     const blockH = block.offsetHeight;
     setSlideUp(Math.max(0, containerH / 2 - blockH / 2));
-  }, [centered, messages.length, isTempChat, chatLoading, documentInfo, uploadingPDF]);
-
-  // Load document info when thread changes
-  useEffect(() => {
-    if (currentThreadId) {
-      loadDocumentInfo();
-    } else {
-      setDocumentInfo(null);
-    }
-  }, [currentThreadId]);
-
-  const loadDocumentInfo = async () => {
-    if (!currentThreadId) return;
-    
-    try {
-      const info = await chatService.getDocumentInfo(currentThreadId);
-      setDocumentInfo(info.has_document ? info : null);
-    } catch (error) {
-      console.error('Error loading document info:', error);
-      setDocumentInfo(null);
-    }
-  };
+  }, [centered, messages.length, isTempChat, chatLoading, uploadingAttachment]);
 
   const handleNewThread = () => {
     // New chat stays client-side until the first message is sent; the backend
@@ -187,6 +166,7 @@ function App() {
     setCurrentThreadId(null);
     setIsTempChat(false);
     setIsSidebarOpen(false);
+    setPendingAttachments([]);
     navigate('/chat');
   };
 
@@ -209,6 +189,7 @@ function App() {
     setIsTempChat(false);
     setCurrentThreadId(threadId);
     setIsSidebarOpen(false);
+    setPendingAttachments([]);
     navigate(`/chat/${threadId}`);
   };
 
@@ -254,45 +235,52 @@ function App() {
     setThreadToDelete(null);
   };
 
-  const handleSendMessage = async (message, tools = []) => {
-    await sendMessage(message, tools);
-    // Refresh threads so a newly created chat (and updated titles) show in the
-    // sidebar — skipped for temporary chats, which must not be persisted.
-    if (!isTempChat) fetchThreads();
-  };
-
-  const handleUploadPDF = async (file) => {
-    // Temporary chats are session-only and never touch storage, and the backend
-    // temp path ignores documents — so document upload is not supported there.
-    if (isTempChat) {
+  const handleSendMessage = async (message, tools = [], attachments = []) => {
+    // ChatGPT-style attachment flow: the user's message (with its attachments)
+    // is shown instantly and the document(s) are uploaded together with the
+    // prompt so the backend processes them as one request. Attachments are
+    // cleared only after a successful send.
+    if (attachments.length > 0 && isTempChat) {
       alert('Document upload is not available in Temporary Chat.');
       return;
     }
 
-    // A document can be attached before any message is sent: if there is no
-    // active thread yet, the upload endpoint creates one for us. We then adopt
-    // that thread id (and update the URL) so the conversation continues there.
-    const threadId = currentThreadId;
-
+    const pending = attachments;
+    // Optimistically hand the message + attachments to the chat hook, which
+    // renders the user message immediately and uploads the docs itself.
     try {
-      setUploadingPDF(true);
-      const response = await chatService.uploadPDF(threadId, file);
-
-      // Adopt the thread the backend created (or returned) so subsequent
-      // messages land in the same conversation as the document.
-      if (response.thread_id && response.thread_id !== currentThreadId) {
-        skipLoadRef.current = true;
-        setCurrentThreadId(response.thread_id);
-        if (!isTempChat) navigate(`/chat/${response.thread_id}`, { replace: true });
-        if (!isTempChat) fetchThreads();
-      }
-      await loadDocumentInfo();
+      setUploadingAttachment(true);
+      await sendMessage(message, tools, null, pending);
+      setPendingAttachments([]);
+      // Refresh threads so a newly created chat (and updated titles) show in the
+      // sidebar — skipped for temporary chats, which must not be persisted.
+      if (!isTempChat) fetchThreads();
     } catch (error) {
-      console.error('Error uploading document:', error);
-      alert('Failed to upload document. Please try again.');
+      console.error('Error sending message with attachments:', error);
+      alert('Failed to send message with the attached document. Please try again.');
+      // Preserve attachments (and the prompt stays in the input) so the user can
+      // retry without re-uploading the file.
+      setPendingAttachments(pending);
     } finally {
-      setUploadingPDF(false);
+      setUploadingAttachment(false);
     }
+  };
+
+  // Add a file as a pending attachment (shown as a chip). It is only uploaded
+  // when the message is sent, matching ChatGPT's behavior.
+  const handleAddAttachment = (file) => {
+    if (isTempChat) {
+      alert('Document upload is not available in Temporary Chat.');
+      return;
+    }
+    setPendingAttachments((prev) => [
+      ...prev,
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, file },
+    ]);
+  };
+
+  const handleRemoveAttachment = (id) => {
+    setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
   const toggleSidebar = () => {
@@ -410,12 +398,12 @@ function App() {
             <div className="w-full max-w-3xl mx-auto">
               <MessageInput
                 onSendMessage={handleSendMessage}
-                onUploadPDF={handleUploadPDF}
+                onAddAttachment={handleAddAttachment}
+                onRemoveAttachment={handleRemoveAttachment}
                 onStop={stop}
-                disabled={chatLoading || uploadingPDF}
-                hasDocument={documentInfo?.has_document}
-                documentInfo={documentInfo}
-                uploadingPDF={uploadingPDF}
+                disabled={chatLoading || uploadingAttachment}
+                pendingAttachments={pendingAttachments}
+                uploadingAttachment={uploadingAttachment}
               />
             </div>
           </div>

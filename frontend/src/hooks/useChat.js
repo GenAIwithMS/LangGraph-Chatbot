@@ -112,10 +112,24 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     }
   };
 
-  const sendMessage = async (message, tools = []) => {
+  const sendMessage = async (message, tools = [], threadIdOverride = null, attachments = []) => {
     if (!message.trim()) return;
 
+    const activeThreadId = threadIdOverride || threadId;
     lastPromptRef.current = message;
+
+    // Optimistically render the user's message right away (with any attached
+    // documents) so it appears instantly — no waiting on network round-trips.
+    const userMessage = {
+      type: 'human',
+      content: message,
+      timestamp: new Date().toISOString(),
+      tools: tools.length > 0 ? tools : undefined,
+      attachments: attachments.length > 0
+        ? attachments.map((a) => ({ name: a.file?.name || a.name }))
+        : undefined,
+    };
+    setMessages(prev => [...prev, userMessage]);
 
     try {
       setLoading(true);
@@ -127,14 +141,23 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         setLoading(false);
       };
 
-      // Add user message immediately
-      const userMessage = {
-        type: 'human',
-        content: message,
-        timestamp: new Date().toISOString(),
-        tools: tools.length > 0 ? tools : undefined,
-      };
-      setMessages(prev => [...prev, userMessage]);
+      // Upload attached documents before streaming so the AI sees them with
+      // this prompt (and the doc is linked to the same thread as the message).
+      // The user message is already rendered above, so this adds no perceived
+      // latency to sending — only the AI answer waits on ingestion.
+      let uploadThreadId = activeThreadId;
+      if (attachments.length > 0) {
+        for (const att of attachments) {
+          const response = await chatService.uploadPDF(uploadThreadId, att.file);
+          if (response.thread_id && response.thread_id !== uploadThreadId) {
+            uploadThreadId = response.thread_id;
+          }
+        }
+        if (uploadThreadId !== activeThreadId && onThreadCreated && uploadThreadId) {
+          onThreadCreated(uploadThreadId);
+        }
+      }
+      const streamThreadId = uploadThreadId;
 
       // Blogs tool: keep the fixed-step progress UI
       if (tools.includes('blogs')) {
@@ -216,7 +239,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
           }
         };
 
-        eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleMessage, handleError, isTempChat);
+        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleMessage, handleError, isTempChat);
         return;
       }
 
@@ -238,7 +261,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         },
       ]);
 
-      eventSourceRef.current = chatService.streamMessage(threadId, message, tools, handleChatChunk, handleStreamError, isTempChat);
+      eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat);
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);
