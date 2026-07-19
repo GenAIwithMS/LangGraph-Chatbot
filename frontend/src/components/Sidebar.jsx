@@ -6,6 +6,7 @@ import {
   Menu,
   X,
   MoreVertical,
+  ChevronDown,
   Search as SearchIcon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -47,6 +48,7 @@ const Sidebar = ({
   const [openMenuId, setOpenMenuId] = useState(null);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [recentsOpen, setRecentsOpen] = useState(true);
   const searchInputRef = useRef(null);
 
   const filteredThreads = useMemo(() => {
@@ -274,8 +276,33 @@ const Sidebar = ({
               </div>
             </div>
 
+            {/* Recents header — toggles the chat history list visibility */}
+            <button
+              type="button"
+              onClick={() => setRecentsOpen((o) => !o)}
+              className="group flex items-center justify-between w-full px-3 pt-3 pb-1 text-left"
+            >
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 group-hover:text-gray-200 transition-colors">
+                Recents
+              </span>
+              <ChevronDown
+                size={16}
+                className={`
+                  text-gray-400 opacity-0 group-hover:opacity-100
+                  transition-transform duration-300 ease-out group-hover:text-gray-200
+                  ${recentsOpen ? 'rotate-0' : '-rotate-90'}
+                `}
+              />
+            </button>
+
             {/* Chat history */}
-            <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll">
+            <div
+              className={`
+                flex-1 overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll
+                transition-[max-height,opacity] duration-300 ease-out
+                ${recentsOpen ? 'max-h-[60vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}
+              `}
+            >
               {filteredThreads.length === 0 ? (
                 <div className="px-3 py-6 text-center text-xs text-gray-500">
                   {query ? 'No chats found' : 'No chats yet'}
